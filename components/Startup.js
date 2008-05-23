@@ -39,8 +39,9 @@ CertImporterStartupService.prototype = {
 		var certdb = Components
 				.classes['@mozilla.org/security/x509certdb;1']
 				.getService(Components.interfaces.nsIX509CertDB);
-		var chrome = DirectoryService.get('CurProcD', Components.interfaces.nsIFile);
-		var files = chrome.directoryEntries;
+		var defaults = DirectoryService.get('CurProcD', Components.interfaces.nsIFile);
+		defaults.append('defaults');
+		var files = defaults.directoryEntries;
 		var file;
 		var sheet;
 		while (files.hasMoreElements())
