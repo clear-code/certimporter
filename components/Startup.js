@@ -1,6 +1,6 @@
-const kCID  = Components.ID('{02c321d0-2909-11dd-bd0b-0800200c9a66}'); 
+const kCID  = Components.ID('{b0e74752-55c5-4d1a-b675-67726df8c273}'); 
 const kID   = '@clear-code.com/certimporter/startup;1';
-const kNAME = "globalChrome.css Startup Service";
+const kNAME = "Cert Importer Startup Service";
 
 const ObserverService = Components
 		.classes['@mozilla.org/observer-service;1']
@@ -39,24 +39,123 @@ CertImporterStartupService.prototype = {
 		var certdb = Components
 				.classes['@mozilla.org/security/x509certdb;1']
 				.getService(Components.interfaces.nsIX509CertDB);
+		const nsIX509Cert = Components.interfaces.nsIX509Cert;
+
+		var installed = {};
+		var nicknames = {};
+		try {
+			certdb.findCertNicknames(null, nsIX509Cert.SERVER_CERT, {}, nicknames);
+			nicknames.value.forEach(function(aNickname) {
+				aNickname = aNickname.split('\x01')[1];
+				var cert = this.serializeCert(certdb.findCertByNickname(null, aNickname));
+				installed[cert] = true;
+			}, this);
+		}
+		catch(e) {
+			// there is no cert.
+		}
+
+		var toBeTrusted = {};
+		var count = 0;
+
 		var defaults = DirectoryService.get('CurProcD', Components.interfaces.nsIFile);
 		defaults.append('defaults');
 		var files = defaults.directoryEntries;
-		var file;
-		var sheet;
 		while (files.hasMoreElements())
 		{
-			file = files.getNext().QueryInterface(Components.interfaces.nsIFile);
+			var file = files.getNext().QueryInterface(Components.interfaces.nsIFile);
 			if (!file.isFile() || !/\.(cer)$/i.test(file.leafName)) continue;
 
+			var contents = this.readFrom(file);
+			if (!contents) continue;
+
+			contents.split(/-+(?:BEGIN|END) CERTIFICATE-+/).forEach(function(aCert) {
+				aCert = aCert.replace(/\s/g, '');
+				if (!aCert) return;
+
+				try {
+					var cert = this.serializeCert(certdb.constructX509FromBase64(aCert));
+					if (cert in installed) return;
+					toBeTrusted[cert] = true;
+					count++;
+				}
+				catch(e) {
+					dump(e+'\n');
+				}
+			}, this);
+			if (!count) continue;
+
 			try {
-				certdb.importCertsFromFile(null, file, Components.interfaces.nsIX509Cert.SERVER_CERT);
+				certdb.importCertsFromFile(null, file, nsIX509Cert.SERVER_CERT);
 			}
 			catch(e) {
 				dump(e+'\n');
 			}
 		}
+
+		nicknames = {};
+		certdb.findCertNicknames(null, nsIX509Cert.SERVER_CERT, {}, nicknames);
+		nicknames.value.forEach(function(aNickname) {
+			aNickname = aNickname.split('\x01')[1];
+			var cert = certdb.findCertByNickname(null, aNickname);
+			if (this.serializeCert(cert) in toBeTrusted) {
+				try {
+					certdb.setCertTrust(cert, nsIX509Cert.SERVER_CERT, nsIX509Cert.TRUSTED_SSL);
+				}
+				catch(e) {
+					dump(e+'\n');
+				}
+			}
+		}, this);
 	},
+
+	serializeCert : function(aCert)
+	{
+		return [
+			aCert.subjectName,
+			aCert.commonName,
+			aCert.organization,
+			aCert.organizationalUnit,
+			aCert.sha1Fingerprint,
+			aCert.md5Fingerprint,
+			aCert.tokenName,
+			aCert.issuerName,
+			aCert.serialNumber,
+			aCert.issuerCommonName,
+			aCert.issuerOrganization,
+			aCert.issuerOrganizationalUnit
+		].join('\n');
+	},
+
+	readFrom : function(aFile, aEncoding)
+	{
+		var fileContents;
+
+		var stream = Components
+						.classes['@mozilla.org/network/file-input-stream;1']
+						.createInstance(Components.interfaces.nsIFileInputStream);
+		try {
+			stream.init(aFile, 1, 0, false); // open as "read only"
+
+			var scriptableStream = Components
+									.classes['@mozilla.org/scriptableinputstream;1']
+									.createInstance(Components.interfaces.nsIScriptableInputStream);
+			scriptableStream.init(stream);
+
+			var fileSize = scriptableStream.available();
+			fileContents = scriptableStream.read(fileSize);
+
+			scriptableStream.close();
+			stream.close();
+		}
+		catch(e) {
+			dump(e+'\n');
+			return null;
+		}
+
+		return fileContents;
+	},
+
 	
 
   
