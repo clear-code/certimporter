@@ -36,10 +36,12 @@ CertImporterStartupService.prototype = {
  
 	registerCerts : function() 
 	{
+		const nsIX509CertDB = Components.interfaces.nsIX509CertDB;
+		const nsIX509Cert = Components.interfaces.nsIX509Cert;
+
 		var certdb = Components
 				.classes['@mozilla.org/security/x509certdb;1']
-				.getService(Components.interfaces.nsIX509CertDB);
-		const nsIX509Cert = Components.interfaces.nsIX509Cert;
+				.getService(nsIX509CertDB);
 
 		var installed = {};
 		var nicknames = {};
@@ -56,7 +58,6 @@ CertImporterStartupService.prototype = {
 		}
 
 		var toBeTrusted = {};
-		var count = 0;
 
 		var defaults = DirectoryService.get('CurProcD', Components.interfaces.nsIFile);
 		defaults.append('defaults');
@@ -69,13 +70,16 @@ CertImporterStartupService.prototype = {
 			var contents = this.readFrom(file);
 			if (!contents) continue;
 
+			var count = 0;
 			contents.split(/-+(?:BEGIN|END) CERTIFICATE-+/).forEach(function(aCert) {
 				aCert = aCert.replace(/\s/g, '');
 				if (!aCert) return;
 
 				try {
 					var cert = this.serializeCert(certdb.constructX509FromBase64(aCert));
-					if (cert in installed) return;
+					if (cert in installed &&
+						certdb.isCertTrusted(cert, nsIX509Cert.SERVER_CERT, nsIX509CertDB.TRUSTED_SSL))
+						return;
 					toBeTrusted[cert] = true;
 					count++;
 				}
@@ -98,13 +102,28 @@ CertImporterStartupService.prototype = {
 		nicknames.value.forEach(function(aNickname) {
 			aNickname = aNickname.split('\x01')[1];
 			var cert = certdb.findCertByNickname(null, aNickname);
-			if (this.serializeCert(cert) in toBeTrusted) {
-				try {
-					certdb.setCertTrust(cert, nsIX509Cert.SERVER_CERT, nsIX509Cert.TRUSTED_SSL);
+			if (!(this.serializeCert(cert) in toBeTrusted)) return;
+			try {
+				certdb.setCertTrust(cert, nsIX509Cert.SERVER_CERT, nsIX509CertDB.TRUSTED_SSL);
+
+				var cacert = null;
+				var issuer = cert;
+				var lastIssuer = '';
+				while (issuer)
+				{
+					if (issuer.type == nsIX509Cert.CA_CERT ||
+						issuer.subjectName == lastIssuer) {
+						cacert = issuer;
+						break;
+					}
+					lastIssuer = issuer.subjectName;
+					issuer = issuer.issuer;
 				}
-				catch(e) {
-					dump(e+'\n');
-				}
+				if (cacert)
+					certdb.setCertTrust(cacert, nsIX509Cert.CA_CERT, nsIX509CertDB.TRUSTED_SSL);
+			}
+			catch(e) {
+				dump(e+'\n');
 			}
 		}, this);
 	},
