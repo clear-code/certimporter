@@ -1,14 +1,20 @@
+const Cc = Components.classes;
+const Ci = Components.interfaces;
+
 const kCID  = Components.ID('{b0e74752-55c5-4d1a-b675-67726df8c273}'); 
 const kID   = '@clear-code.com/certimporter/startup;1';
 const kNAME = "Cert Importer Startup Service";
 
-const ObserverService = Components
-		.classes['@mozilla.org/observer-service;1']
-		.getService(Components.interfaces.nsIObserverService);
+const ObserverService = Cc['@mozilla.org/observer-service;1']
+		.getService(Ci.nsIObserverService);
 
-const DirectoryService = Components
-		.classes['@mozilla.org/file/directory_service;1']
-		.getService(Components.interfaces.nsIProperties);
+const DirectoryService = Cc['@mozilla.org/file/directory_service;1']
+		.getService(Ci.nsIProperties);
+
+const nsIX509CertDB = Ci.nsIX509CertDB;
+const nsIX509Cert   = Ci.nsIX509Cert;
+const nsIX509Cert2  = 'nsIX509Cert2' in Ci ? Ci.nsIX509Cert2 : null ;
+const nsIX509Cert3  = 'nsIX509Cert3' in Ci ? Ci.nsIX509Cert3 : null ;
 
 
 const DEBUG = false;
@@ -47,11 +53,7 @@ CertImporterStartupService.prototype = {
  
 	registerCerts : function() 
 	{
-		const nsIX509CertDB = Components.interfaces.nsIX509CertDB;
-		const nsIX509Cert = Components.interfaces.nsIX509Cert;
-
-		var certdb = Components
-				.classes['@mozilla.org/security/x509certdb;1']
+		var certdb = Cc['@mozilla.org/security/x509certdb;1']
 				.getService(nsIX509CertDB);
 
 		var installed = {};
@@ -70,12 +72,12 @@ CertImporterStartupService.prototype = {
 
 		var toBeTrusted = {};
 
-		var defaults = DirectoryService.get('CurProcD', Components.interfaces.nsIFile);
+		var defaults = DirectoryService.get('CurProcD', Ci.nsIFile);
 		defaults.append('defaults');
 		var files = defaults.directoryEntries;
 		while (files.hasMoreElements())
 		{
-			var file = files.getNext().QueryInterface(Components.interfaces.nsIFile);
+			var file = files.getNext().QueryInterface(Ci.nsIFile);
 			if (!file.isFile() || !/\.(cer|crt)$/i.test(file.leafName)) continue;
 
 			var contents = this.readFrom(file);
@@ -171,15 +173,13 @@ CertImporterStartupService.prototype = {
 	{
 		var fileContents;
 
-		var stream = Components
-						.classes['@mozilla.org/network/file-input-stream;1']
-						.createInstance(Components.interfaces.nsIFileInputStream);
+		var stream = Cc['@mozilla.org/network/file-input-stream;1']
+						.createInstance(Ci.nsIFileInputStream);
 		try {
 			stream.init(aFile, 1, 0, false); // open as "read only"
 
-			var scriptableStream = Components
-									.classes['@mozilla.org/scriptableinputstream;1']
-									.createInstance(Components.interfaces.nsIScriptableInputStream);
+			var scriptableStream = Cc['@mozilla.org/scriptableinputstream;1']
+									.createInstance(Ci.nsIScriptableInputStream);
 			scriptableStream.init(stream);
 
 			var fileSize = scriptableStream.available();
@@ -201,8 +201,8 @@ CertImporterStartupService.prototype = {
   
 	QueryInterface : function(aIID) 
 	{
-		if(!aIID.equals(Components.interfaces.nsIObserver) &&
-			!aIID.equals(Components.interfaces.nsISupports)) {
+		if (!aIID.equals(Ci.nsIObserver) &&
+			!aIID.equals(Ci.nsISupports)) {
 			throw Components.results.NS_ERROR_NO_INTERFACE;
 		}
 		return this;
@@ -213,7 +213,7 @@ CertImporterStartupService.prototype = {
 var gModule = { 
 	registerSelf : function(aCompMgr, aFileSpec, aLocation, aType)
 	{
-		aCompMgr = aCompMgr.QueryInterface(Components.interfaces.nsIComponentRegistrar);
+		aCompMgr = aCompMgr.QueryInterface(Ci.nsIComponentRegistrar);
 		aCompMgr.registerFactoryLocation(
 			kCID,
 			kNAME,
@@ -223,8 +223,8 @@ var gModule = {
 			aType
 		);
 
-		var catMgr = Components.classes['@mozilla.org/categorymanager;1']
-					.getService(Components.interfaces.nsICategoryManager);
+		var catMgr = Cc['@mozilla.org/categorymanager;1']
+					.getService(Ci.nsICategoryManager);
 		catMgr.addCategoryEntry('app-startup', kNAME, kID, true, true);
 	},
 
@@ -236,8 +236,8 @@ var gModule = {
 	factory : {
 		QueryInterface : function(aIID)
 		{
-			if (!aIID.equals(Components.interfaces.nsISupports) &&
-				!aIID.equals(Components.interfaces.nsIFactory)) {
+			if (!aIID.equals(Ci.nsISupports) &&
+				!aIID.equals(Ci.nsIFactory)) {
 				throw Components.results.NS_ERROR_NO_INTERFACE;
 			}
 			return this;
