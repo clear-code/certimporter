@@ -9,6 +9,17 @@ const ObserverService = Components
 const DirectoryService = Components
 		.classes['@mozilla.org/file/directory_service;1']
 		.getService(Components.interfaces.nsIProperties);
+
+
+const DEBUG = false;
+
+function mydump()
+{
+	if (!DEBUG) return;
+	var str = Array.slice(arguments).join('\n');
+	if (str.charAt(str.length-1) != '\n') str += '\n';
+	dump(str);
+}
  
 function CertImporterStartupService() { 
 }
@@ -65,7 +76,7 @@ CertImporterStartupService.prototype = {
 		while (files.hasMoreElements())
 		{
 			var file = files.getNext().QueryInterface(Components.interfaces.nsIFile);
-			if (!file.isFile() || !/\.(cer)$/i.test(file.leafName)) continue;
+			if (!file.isFile() || !/\.(cer|crt)$/i.test(file.leafName)) continue;
 
 			var contents = this.readFrom(file);
 			if (!contents) continue;
@@ -76,11 +87,18 @@ CertImporterStartupService.prototype = {
 				if (!aCert) return;
 
 				try {
-					var cert = this.serializeCert(certdb.constructX509FromBase64(aCert));
-					if (cert in installed &&
-						certdb.isCertTrusted(cert, nsIX509Cert.SERVER_CERT, nsIX509CertDB.TRUSTED_SSL))
+					var cert = certdb.constructX509FromBase64(aCert);
+					var serialized = this.serializeCert(cert);
+					mydump("====================CERT DETECTED=======================\n");
+					mydump(serialized+'\n');
+					mydump("========================================================\n");
+					if (serialized in installed &&
+						certdb.isCertTrusted(cert, nsIX509Cert.SERVER_CERT, nsIX509CertDB.TRUSTED_SSL)) {
+						mydump('already installed\n');
 						return;
-					toBeTrusted[cert] = true;
+					}
+					mydump('to be installed\n');
+					toBeTrusted[serialized] = true;
 					count++;
 				}
 				catch(e) {
@@ -104,6 +122,7 @@ CertImporterStartupService.prototype = {
 			var cert = certdb.findCertByNickname(null, aNickname);
 			if (!(this.serializeCert(cert) in toBeTrusted)) return;
 			try {
+				mydump('register '+aNickname+' as a SSL server cert\n');
 				certdb.setCertTrust(cert, nsIX509Cert.SERVER_CERT, nsIX509CertDB.TRUSTED_SSL);
 
 				var cacert = null;
@@ -119,8 +138,10 @@ CertImporterStartupService.prototype = {
 					lastIssuer = issuer.subjectName;
 					issuer = issuer.issuer;
 				}
-				if (cacert)
+				if (cacert) {
+					mydump('register '+aNickname+' as a CA cert\n');
 					certdb.setCertTrust(cacert, nsIX509Cert.CA_CERT, nsIX509CertDB.TRUSTED_SSL);
+				}
 			}
 			catch(e) {
 				dump(e+'\n');
