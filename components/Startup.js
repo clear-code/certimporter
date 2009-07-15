@@ -17,7 +17,7 @@ const nsIX509Cert2  = 'nsIX509Cert2' in Ci ? Ci.nsIX509Cert2 : null ;
 const nsIX509Cert3  = 'nsIX509Cert3' in Ci ? Ci.nsIX509Cert3 : null ;
 
 
-const DEBUG = false;
+const DEBUG = true;
 
 function mydump()
 {
@@ -123,10 +123,54 @@ CertImporterStartupService.prototype = {
 			aNickname = aNickname.split('\x01')[1];
 			var cert = certdb.findCertByNickname(null, aNickname);
 			if (!(this.serializeCert(cert) in toBeTrusted)) return;
-			try {
-				mydump('register '+aNickname+' as a SSL server cert\n');
-				certdb.setCertTrust(cert, nsIX509Cert.SERVER_CERT, nsIX509CertDB.TRUSTED_SSL);
 
+			if (nsIX509Cert2) cert = cert.QueryInterface(nsIX509Cert2);
+
+			try {
+				if (!nsIX509Cert2 || cert.certType & nsIX509Cert.SERVER_CERT) {
+					mydump('register '+aNickname+' as a SSL server cert\n');
+					certdb.setCertTrust(
+						cert,
+						nsIX509Cert.SERVER_CERT,
+						nsIX509CertDB.TRUSTED_SSL
+					);
+				}
+			}
+			catch(e) {
+				dump(e+'\n');
+			}
+
+			try {
+				if (!nsIX509Cert2 || cert.certType & nsIX509Cert.USER_CERT) {
+					mydump('register '+aNickname+' as an user cert\n');
+					certdb.setCertTrust(
+						cert,
+						nsIX509Cert.USER_CERT,
+						nsIX509CertDB.TRUSTED_SSL |
+						nsIX509CertDB.TRUSTED_EMAIL |
+						nsIX509CertDB.TRUSTED_OBJSIGN
+					);
+				}
+			}
+			catch(e) {
+				dump(e+'\n');
+			}
+
+			try {
+				if (!nsIX509Cert2 || cert.certType & nsIX509Cert.EMAIL_CERT) {
+					mydump('register '+aNickname+' as an e-mail cert\n');
+					certdb.setCertTrust(
+						cert,
+						nsIX509Cert.EMAIL_CERT,
+						nsIX509CertDB.TRUSTED_EMAIL
+					);
+				}
+			}
+			catch(e) {
+				dump(e+'\n');
+			}
+
+			try {
 				var cacert = null;
 				var issuer = cert;
 				var lastIssuer = '';
@@ -141,8 +185,14 @@ CertImporterStartupService.prototype = {
 					issuer = issuer.issuer;
 				}
 				if (cacert) {
-					mydump('register '+aNickname+' as a CA cert\n');
-					certdb.setCertTrust(cacert, nsIX509Cert.CA_CERT, nsIX509CertDB.TRUSTED_SSL);
+					mydump('register '+cacert.subjectName+' as a CA cert\n');
+					certdb.setCertTrust(
+						cacert,
+						nsIX509Cert.CA_CERT,
+						nsIX509CertDB.TRUSTED_SSL |
+						nsIX509CertDB.TRUSTED_EMAIL |
+						nsIX509CertDB.TRUSTED_OBJSIGN
+					);
 				}
 			}
 			catch(e) {
