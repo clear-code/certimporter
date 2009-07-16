@@ -56,21 +56,40 @@ CertImporterStartupService.prototype = {
 		var certdb = Cc['@mozilla.org/security/x509certdb;1']
 				.getService(nsIX509CertDB);
 
+		var certTypes = [
+				nsIX509Cert.CA_CERT,
+				nsIX509Cert.SERVER_CERT,
+				nsIX509Cert.EMAIL_CERT,
+				nsIX509Cert.USER_CERT
+			];
+		var certCounts = {};
+
+		var certTrusts = {};
+		certTrusts[nsIX509Cert.CA_CERT] = nsIX509CertDB.TRUSTED_SSL | nsIX509CertDB.TRUSTED_EMAIL | nsIX509CertDB.TRUSTED_OBJSIGN;
+		certTrusts[nsIX509Cert.SERVER_CERT] = nsIX509CertDB.TRUSTED_SSL;
+		certTrusts[nsIX509Cert.EMAIL_CERT] = nsIX509CertDB.TRUSTED_EMAIL;
+		certTrusts[nsIX509Cert.USER_CERT] = nsIX509CertDB.TRUSTED_EMAIL | nsIX509CertDB.TRUSTED_OBJSIGN;
+
 		var installed = {};
-		var nicknames = {};
-		try {
-			certdb.findCertNicknames(null, nsIX509Cert.SERVER_CERT, {}, nicknames);
-			nicknames.value.forEach(function(aNickname) {
-				aNickname = aNickname.split('\x01')[1];
-				var cert = this.serializeCert(certdb.findCertByNickname(null, aNickname));
-				installed[cert] = true;
-			}, this);
-		}
-		catch(e) {
-			// there is no cert.
-		}
+		certTypes.forEach(function(aType) {
+			try {
+				var nicknames = {};
+				certdb.findCertNicknames(null, aType, {}, nicknames);
+				certCounts[aType] = nicknames.value.length;
+				nicknames.value.forEach(function(aNickname) {
+					aNickname = aNickname.split('\x01')[1];
+					var cert = certdb.findCertByNickname(null, aNickname);
+					var serialized = this.serializeCert(cert);
+					installed[serialized] = true;
+				}, this);
+			}
+			catch(e) {
+				// there is no cert.
+			}
+		}, this);
 
 		var toBeTrusted = {};
+		var toBeTrustedCount = 0;
 
 		var defaults = DirectoryService.get('CurProcD', Ci.nsIFile);
 		defaults.append('defaults');
@@ -88,129 +107,145 @@ CertImporterStartupService.prototype = {
 			if (!contents) continue;
 
 			var count = 0;
+			var counts = {};
+			counts[nsIX509Cert.CA_CERT] = 0;
+			counts[nsIX509Cert.SERVER_CERT] = 0;
+			counts[nsIX509Cert.EMAIL_CERT] = 0;
+			counts[nsIX509Cert.USER_CERT] = 0;
+
 			contents.split(/-+(?:BEGIN|END) CERTIFICATE-+/).forEach(function(aCert) {
 				aCert = aCert.replace(/\s/g, '');
 				if (!aCert) return;
 
 				try {
 					var cert = certdb.constructX509FromBase64(aCert);
+					if (nsIX509Cert2) cert = cert.QueryInterface(nsIX509Cert2);
+
 					var serialized = this.serializeCert(cert);
 					mydump("====================CERT DETECTED=======================\n");
-					mydump(serialized+'\n');
+					mydump('TYPE: '+cert.certType);
+					mydump(serialized.split('\n')[0]);
 					mydump("========================================================\n");
-					if (serialized in installed &&
-						certdb.isCertTrusted(cert, nsIX509Cert.SERVER_CERT, nsIX509CertDB.TRUSTED_SSL)) {
-						mydump('already installed\n');
-						return;
+					if (serialized in installed) {
+						if (certTypes.some(function(aType) {
+								certdb.isCertTrusted(cert, aType, certTrusts[aType])
+							}, this)) {
+							mydump('already installed\n');
+							return;
+						}
 					}
 					mydump('to be installed\n');
 					toBeTrusted[serialized] = true;
 					count++;
+					toBeTrustedCount++;
+
+					certTypes.forEach(function(aType) {
+						if (!nsIX509Cert2 ||
+							!cert.certType ||
+							cert.certType & aType)
+							counts[aType]++;
+					}, this)
+					// hack to force-detect CA certs
+					if (cert.certType == nsIX509Cert.CA_CERT)
+						counts[nsIX509Cert.SERVER_CERT]++;
 				}
 				catch(e) {
 					dump(e+'\n');
 				}
 			}, this);
-			if (!count) continue;
 
+			if (!count) {
+				mydump('SKIP '+file.path+' (no count)');
+				continue;
+			}
+
+			var type = null;
+			certTypes.some(function(aType) {
+				if (aType == nsIX509Cert.CA_CERT) return false;
+				if (!nsIX509Cert2 || counts[aType]) {
+					type = aType;
+					return true;
+				}
+				return false;
+			}, this)
 			try {
-				certdb.importCertsFromFile(null, file, nsIX509Cert.SERVER_CERT);
+				if (type) {
+					mydump('IMPORT '+file.path+' as '+type);
+					certdb.importCertsFromFile(null, file, type);
+				}
+				else {
+					mydump('SKIP '+file.path);
+				}
 			}
 			catch(e) {
-				dump(e+'\n');
+				dump('TYPE:'+type+'\n'+e+'\n');
 			}
 		}
 
-		nicknames = {};
-		certdb.findCertNicknames(null, nsIX509Cert.SERVER_CERT, {}, nicknames);
-		nicknames.value.forEach(function(aNickname) {
-			aNickname = aNickname.split('\x01')[1];
-			var cert = certdb.findCertByNickname(null, aNickname);
-			if (!(this.serializeCert(cert) in toBeTrusted)) return;
+		if (!toBeTrustedCount) return;
 
-			mydump('========= '+aNickname+' ===========');
-			if (nsIX509Cert2) {
-				cert = cert.QueryInterface(nsIX509Cert2);
-				mydump('TYPE: '+cert.certType);
-			}
+		certTypes.forEach(function(aType) {
+			var nicknames = {};
+			certdb.findCertNicknames(null, aType, {}, nicknames);
 
+			if (certCounts[aType] == nicknames.value.length) return;
 
-			try {
-				if (!nsIX509Cert2 || cert.certType & nsIX509Cert.SERVER_CERT) {
-					mydump('register '+aNickname+' as a SSL server cert\n');
-					certdb.setCertTrust(
-						cert,
-						nsIX509Cert.SERVER_CERT,
-						nsIX509CertDB.TRUSTED_SSL
-					);
+			nicknames.value.forEach(function(aNickname) {
+				aNickname = aNickname.split('\x01')[1];
+				var cert;
+				try {
+					cert = certdb.findCertByNickname(null, aNickname);
+					if (!(this.serializeCert(cert) in toBeTrusted)) return;
 				}
-			}
-			catch(e) {
-				dump(e+'\n');
-			}
-
-			try {
-				if (!nsIX509Cert2 || cert.certType & nsIX509Cert.USER_CERT) {
-					mydump('register '+aNickname+' as an user cert\n');
-					certdb.setCertTrust(
-						cert,
-						nsIX509Cert.USER_CERT,
-						nsIX509CertDB.TRUSTED_SSL |
-						nsIX509CertDB.TRUSTED_EMAIL |
-						nsIX509CertDB.TRUSTED_OBJSIGN
-					);
+				catch(e) {
+					return;
 				}
-			}
-			catch(e) {
-				dump(e+'\n');
-			}
 
-			try {
-				if (!nsIX509Cert2 || cert.certType & nsIX509Cert.EMAIL_CERT) {
-					mydump('register '+aNickname+' as an e-mail cert\n');
-					certdb.setCertTrust(
-						cert,
-						nsIX509Cert.EMAIL_CERT,
-						nsIX509CertDB.TRUSTED_EMAIL
-					);
+				mydump('========= '+aNickname+' ===========');
+				if (nsIX509Cert2) {
+					cert = cert.QueryInterface(nsIX509Cert2);
+					mydump('TYPE: '+cert.certType);
 				}
-			}
-			catch(e) {
-				dump(e+'\n');
-			}
 
-			try {
-				var cacert = null;
-				var issuer = cert;
-				var lastIssuer = '';
-				while (issuer)
-				{
-					mydump('CA check: '+issuer.subjectName);
-					if ((nsIX509Cert2 && (issuer.certType & nsIX509Cert.CA_CERT)) ||
-						issuer.subjectName == lastIssuer) {
-						mydump(issuer.subjectName+' is CA');
-						if (nsIX509Cert2) mydump('  (type: '+issuer.certType+')');
-						cacert = issuer;
-						break;
+				certTypes.forEach(function(aType) {
+					try {
+						if (!nsIX509Cert2 || cert.certType & aType) {
+							mydump('register as type '+aType+': '+aNickname);
+							certdb.setCertTrust(cert, aType, certTrusts[aType]);
+						}
 					}
-					lastIssuer = issuer.subjectName;
-					issuer = issuer.issuer;
-					if (issuer && nsIX509Cert2) issuer = issuer.QueryInterface(nsIX509Cert2);
+					catch(e) {
+						dump('TYPE:'+aType+'\n'+e+'\n');
+					}
+				}, this)
+
+				try {
+					var cacert = null;
+					var issuer = cert;
+					var lastIssuer = '';
+					while (issuer)
+					{
+						mydump('CA check: '+issuer.subjectName);
+						if ((nsIX509Cert2 && (issuer.certType & nsIX509Cert.CA_CERT)) ||
+							issuer.subjectName == lastIssuer) {
+							mydump(issuer.subjectName+' is CA');
+							if (nsIX509Cert2) mydump('  (type: '+issuer.certType+')');
+							cacert = issuer;
+							break;
+						}
+						lastIssuer = issuer.subjectName;
+						issuer = issuer.issuer;
+						if (issuer && nsIX509Cert2) issuer = issuer.QueryInterface(nsIX509Cert2);
+					}
+					if (cacert) {
+						mydump('register '+cacert.subjectName+' as a CA cert\n');
+						certdb.setCertTrust(cacert, nsIX509Cert.CA_CERT, certTrusts[nsIX509Cert.CA_CERT]);
+					}
 				}
-				if (cacert) {
-					mydump('register '+cacert.subjectName+' as a CA cert\n');
-					certdb.setCertTrust(
-						cacert,
-						nsIX509Cert.CA_CERT,
-						nsIX509CertDB.TRUSTED_SSL |
-						nsIX509CertDB.TRUSTED_EMAIL |
-						nsIX509CertDB.TRUSTED_OBJSIGN
-					);
+				catch(e) {
+					dump(e+'\n');
 				}
-			}
-			catch(e) {
-				dump(e+'\n');
-			}
+			}, this);
 		}, this);
 	},
 
