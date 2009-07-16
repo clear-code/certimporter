@@ -189,6 +189,7 @@ CertImporterStartupService.prototype = {
 					if ((nsIX509Cert2 && (issuer.certType & nsIX509Cert.CA_CERT)) ||
 						issuer.subjectName == lastIssuer) {
 						mydump(issuer.subjectName+' is CA');
+						if (nsIX509Cert2) mydump('  (type: '+issuer.certType+')');
 						cacert = issuer;
 						break;
 					}
