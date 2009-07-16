@@ -17,7 +17,7 @@ const nsIX509Cert2  = 'nsIX509Cert2' in Ci ? Ci.nsIX509Cert2 : null ;
 const nsIX509Cert3  = 'nsIX509Cert3' in Ci ? Ci.nsIX509Cert3 : null ;
 
 
-const DEBUG = true;
+const DEBUG = false;
 
 function mydump()
 {
@@ -128,7 +128,12 @@ CertImporterStartupService.prototype = {
 			var cert = certdb.findCertByNickname(null, aNickname);
 			if (!(this.serializeCert(cert) in toBeTrusted)) return;
 
-			if (nsIX509Cert2) cert = cert.QueryInterface(nsIX509Cert2);
+			mydump('========= '+aNickname+' ===========');
+			if (nsIX509Cert2) {
+				cert = cert.QueryInterface(nsIX509Cert2);
+				mydump('TYPE: '+cert.certType);
+			}
+
 
 			try {
 				if (!nsIX509Cert2 || cert.certType & nsIX509Cert.SERVER_CERT) {
@@ -180,13 +185,16 @@ CertImporterStartupService.prototype = {
 				var lastIssuer = '';
 				while (issuer)
 				{
-					if (issuer.type == nsIX509Cert.CA_CERT ||
+					mydump('CA check: '+issuer.subjectName);
+					if ((nsIX509Cert2 && (issuer.certType & nsIX509Cert.CA_CERT)) ||
 						issuer.subjectName == lastIssuer) {
+						mydump(issuer.subjectName+' is CA');
 						cacert = issuer;
 						break;
 					}
 					lastIssuer = issuer.subjectName;
 					issuer = issuer.issuer;
+					if (issuer && nsIX509Cert2) issuer = issuer.QueryInterface(nsIX509Cert2);
 				}
 				if (cacert) {
 					mydump('register '+cacert.subjectName+' as a CA cert\n');
