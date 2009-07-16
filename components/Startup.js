@@ -78,7 +78,11 @@ CertImporterStartupService.prototype = {
 		while (files.hasMoreElements())
 		{
 			var file = files.getNext().QueryInterface(Ci.nsIFile);
-			if (!file.isFile() || !/\.(cer|crt)$/i.test(file.leafName)) continue;
+			if (
+				!file.isFile() ||
+				!/\.(cer|crt|pem)$/i.test(file.leafName)
+				)
+				continue;
 
 			var contents = this.readFrom(file);
 			if (!contents) continue;
