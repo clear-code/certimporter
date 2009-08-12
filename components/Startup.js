@@ -20,7 +20,7 @@ const nsIX509Cert2  = 'nsIX509Cert2' in Ci ? Ci.nsIX509Cert2 : null ;
 const nsIX509Cert3  = 'nsIX509Cert3' in Ci ? Ci.nsIX509Cert3 : null ;
 
 
-const DEBUG = true;
+const DEBUG = false;
 
 function mydump()
 {
