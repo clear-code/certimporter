@@ -11,13 +11,16 @@ const ObserverService = Cc['@mozilla.org/observer-service;1']
 const DirectoryService = Cc['@mozilla.org/file/directory_service;1']
 		.getService(Ci.nsIProperties);
 
+const Pref = Cc['@mozilla.org/preferences;1']
+		.getService(Ci.nsIPrefBranch)
+
 const nsIX509CertDB = Ci.nsIX509CertDB;
 const nsIX509Cert   = Ci.nsIX509Cert;
 const nsIX509Cert2  = 'nsIX509Cert2' in Ci ? Ci.nsIX509Cert2 : null ;
 const nsIX509Cert3  = 'nsIX509Cert3' in Ci ? Ci.nsIX509Cert3 : null ;
 
 
-const DEBUG = false;
+const DEBUG = true;
 
 function mydump()
 {
@@ -184,6 +187,13 @@ CertImporterStartupService.prototype = {
 
 		if (!toBeTrustedCount) return;
 
+		var importAsCACert = false;
+		try {
+			importAsCACert = Pref.getBoolPref('extensions.certimporter.importAsCACert');
+		}
+		catch(e) {
+		}
+
 		certTypes.forEach(function(aType) {
 			var nicknames = {};
 			certdb.findCertNicknames(null, aType, {}, nicknames);
@@ -219,6 +229,7 @@ CertImporterStartupService.prototype = {
 					}
 				}, this)
 
+				if (!importAsCACert) return;
 				try {
 					var cacert = null;
 					var issuer = cert;
