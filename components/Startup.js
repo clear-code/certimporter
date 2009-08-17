@@ -1,3 +1,5 @@
+const DEBUG = false;
+
 const Cc = Components.classes;
 const Ci = Components.interfaces;
 
@@ -14,13 +16,27 @@ const DirectoryService = Cc['@mozilla.org/file/directory_service;1']
 const Pref = Cc['@mozilla.org/preferences;1']
 		.getService(Ci.nsIPrefBranch)
 
+const certdb = Cc['@mozilla.org/security/x509certdb;1']
+		.getService(nsIX509CertDB);
+
 const nsIX509CertDB = Ci.nsIX509CertDB;
 const nsIX509Cert   = Ci.nsIX509Cert;
 const nsIX509Cert2  = 'nsIX509Cert2' in Ci ? Ci.nsIX509Cert2 : null ;
 const nsIX509Cert3  = 'nsIX509Cert3' in Ci ? Ci.nsIX509Cert3 : null ;
 
+const certTypes = [
+		nsIX509Cert.CA_CERT,
+		nsIX509Cert.SERVER_CERT,
+		nsIX509Cert.EMAIL_CERT,
+		nsIX509Cert.USER_CERT
+	];
 
-const DEBUG = false;
+var certTrusts = {};
+certTrusts[nsIX509Cert.CA_CERT] = nsIX509CertDB.TRUSTED_SSL | nsIX509CertDB.TRUSTED_EMAIL | nsIX509CertDB.TRUSTED_OBJSIGN;
+certTrusts[nsIX509Cert.SERVER_CERT] = nsIX509CertDB.TRUSTED_SSL;
+certTrusts[nsIX509Cert.EMAIL_CERT] = nsIX509CertDB.TRUSTED_EMAIL;
+certTrusts[nsIX509Cert.USER_CERT] = nsIX509CertDB.TRUSTED_EMAIL | nsIX509CertDB.TRUSTED_OBJSIGN;
+
 
 function mydump()
 {
@@ -56,22 +72,17 @@ CertImporterStartupService.prototype = {
  
 	registerCerts : function() 
 	{
-		var certdb = Cc['@mozilla.org/security/x509certdb;1']
-				.getService(nsIX509CertDB);
+		var defaults = DirectoryService.get('CurProcD', Ci.nsIFile);
+		defaults.append('defaults');
+		this.registerCertsInDirectory(defaults);
 
-		var certTypes = [
-				nsIX509Cert.CA_CERT,
-				nsIX509Cert.SERVER_CERT,
-				nsIX509Cert.EMAIL_CERT,
-				nsIX509Cert.USER_CERT
-			];
+		var profile = DirectoryService.get('ProfD', Ci.nsIFile);
+		this.registerCertsInDirectory(profile);
+	},
+ 
+	registerCertsInDirectory : function(aDirectory) 
+	{
 		var certCounts = {};
-
-		var certTrusts = {};
-		certTrusts[nsIX509Cert.CA_CERT] = nsIX509CertDB.TRUSTED_SSL | nsIX509CertDB.TRUSTED_EMAIL | nsIX509CertDB.TRUSTED_OBJSIGN;
-		certTrusts[nsIX509Cert.SERVER_CERT] = nsIX509CertDB.TRUSTED_SSL;
-		certTrusts[nsIX509Cert.EMAIL_CERT] = nsIX509CertDB.TRUSTED_EMAIL;
-		certTrusts[nsIX509Cert.USER_CERT] = nsIX509CertDB.TRUSTED_EMAIL | nsIX509CertDB.TRUSTED_OBJSIGN;
 
 		var installed = {};
 		certTypes.forEach(function(aType) {
@@ -94,9 +105,7 @@ CertImporterStartupService.prototype = {
 		var toBeTrusted = {};
 		var toBeTrustedCount = 0;
 
-		var defaults = DirectoryService.get('CurProcD', Ci.nsIFile);
-		defaults.append('defaults');
-		var files = defaults.directoryEntries;
+		var files = aDirectory.directoryEntries;
 		while (files.hasMoreElements())
 		{
 			var file = files.getNext().QueryInterface(Ci.nsIFile);
