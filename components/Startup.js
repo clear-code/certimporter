@@ -16,8 +16,7 @@ const DirectoryService = Cc['@mozilla.org/file/directory_service;1']
 const Pref = Cc['@mozilla.org/preferences;1']
 		.getService(Ci.nsIPrefBranch)
 
-const certdb = Cc['@mozilla.org/security/x509certdb;1']
-		.getService(nsIX509CertDB);
+var certdb;
 
 const nsIX509CertDB = Ci.nsIX509CertDB;
 const nsIX509Cert   = Ci.nsIX509Cert;
@@ -67,6 +66,9 @@ CertImporterStartupService.prototype = {
  
 	init : function() 
 	{
+		certdb = Cc['@mozilla.org/security/x509certdb;1']
+				.getService(nsIX509CertDB);
+
 		this.registerCerts();
 	},
  
