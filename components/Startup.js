@@ -17,6 +17,7 @@ const Pref = Cc['@mozilla.org/preferences;1']
 		.getService(Ci.nsIPrefBranch)
 
 var certdb;
+var certOverride;
 
 const nsIX509CertDB = Ci.nsIX509CertDB;
 const nsIX509Cert   = Ci.nsIX509Cert;
@@ -35,6 +36,12 @@ certTrusts[nsIX509Cert.CA_CERT] = nsIX509CertDB.TRUSTED_SSL | nsIX509CertDB.TRUS
 certTrusts[nsIX509Cert.SERVER_CERT] = nsIX509CertDB.TRUSTED_SSL;
 certTrusts[nsIX509Cert.EMAIL_CERT] = nsIX509CertDB.TRUSTED_EMAIL;
 certTrusts[nsIX509Cert.USER_CERT] = nsIX509CertDB.TRUSTED_EMAIL | nsIX509CertDB.TRUSTED_OBJSIGN;
+
+const nsICertOverrideService = Ci.nsICertOverrideService;
+const certOverrideFlags = nsICertOverrideService.ERROR_UNTRUSTED | nsICertOverrideService.ERROR_MISMATCH | nsICertOverrideService.ERROR_TIME;
+
+var importAsCACert = false;
+var addException   = 0;
 
 
 function mydump()
@@ -68,6 +75,22 @@ CertImporterStartupService.prototype = {
 	{
 		certdb = Cc['@mozilla.org/security/x509certdb;1']
 				.getService(nsIX509CertDB);
+		certOverride = Cc['@mozilla.org/security/certoverride;1']
+				.getService(nsICertOverrideService);
+
+		try {
+			importAsCACert = Pref.getBoolPref('extensions.certimporter.importAsCACert');
+		}
+		catch(e) {
+		}
+
+		try {
+			addException = Pref.getIntPref('extensions.certimporter.addException');
+			if (addException < 0)
+				addException = Pref.getIntPref('network.proxy.type') == 2 ? 1 : 0 ;
+		}
+		catch(e) {
+		}
 
 		this.registerCerts();
 	},
@@ -107,6 +130,9 @@ CertImporterStartupService.prototype = {
 		var toBeTrusted = {};
 		var toBeTrustedCount = 0;
 
+		var toBeAddedToException = {};
+		var toBeAddedToExceptionCount = 0;
+
 		var files = aDirectory.directoryEntries;
 		while (files.hasMoreElements())
 		{
@@ -136,22 +162,34 @@ CertImporterStartupService.prototype = {
 					if (nsIX509Cert2) cert = cert.QueryInterface(nsIX509Cert2);
 
 					var serialized = this.serializeCert(cert);
+					var overrideCount = certOverride.isCertUsedForOverrides(cert, false, true);
 					mydump("====================CERT DETECTED=======================\n");
 					mydump('TYPE: '+cert.certType);
 					mydump(serialized.split('\n')[0]);
+					mydump('overriden: '+overrideCount);
 					mydump("========================================================\n");
 					if (serialized in installed) {
 						if (certTypes.some(function(aType) {
 								certdb.isCertTrusted(cert, aType, certTrusts[aType])
 							}, this)) {
 							mydump('already installed\n');
+							if (addException && !overrideCount) {
+								toBeAddedToException[serialized] = true;
+								toBeAddedToExceptionCount++;
+							}
 							return;
 						}
 					}
 					mydump('to be installed\n');
 					toBeTrusted[serialized] = true;
-					count++;
 					toBeTrustedCount++;
+
+					if (addException) {
+						toBeAddedToException[serialized] = true;
+						toBeAddedToExceptionCount++;
+					}
+
+					count++;
 
 					certTypes.forEach(function(aType) {
 						if (!nsIX509Cert2 ||
@@ -196,14 +234,7 @@ CertImporterStartupService.prototype = {
 			}
 		}
 
-		if (!toBeTrustedCount) return;
-
-		var importAsCACert = false;
-		try {
-			importAsCACert = Pref.getBoolPref('extensions.certimporter.importAsCACert');
-		}
-		catch(e) {
-		}
+		if (!toBeTrustedCount && !toBeAddedToExceptionCount) return;
 
 		certTypes.forEach(function(aType) {
 			var nicknames = {};
@@ -214,9 +245,13 @@ CertImporterStartupService.prototype = {
 			nicknames.value.forEach(function(aNickname) {
 				aNickname = aNickname.split('\x01')[1];
 				var cert;
+				var serialized;
 				try {
 					cert = certdb.findCertByNickname(null, aNickname);
-					if (!(this.serializeCert(cert) in toBeTrusted)) return;
+					serialized = this.serializeCert(cert);
+					if (!(serialized in toBeTrusted) &&
+						!(serialized in toBeAddedToException))
+						return;
 				}
 				catch(e) {
 					return;
@@ -228,44 +263,57 @@ CertImporterStartupService.prototype = {
 					mydump('TYPE: '+cert.certType);
 				}
 
-				certTypes.forEach(function(aType) {
-					try {
-						if (!nsIX509Cert2 || cert.certType & aType) {
-							mydump('register as type '+aType+': '+aNickname);
-							certdb.setCertTrust(cert, aType, certTrusts[aType]);
+				if (serialized in toBeTrusted) {
+					certTypes.forEach(function(aType) {
+						try {
+							if (!nsIX509Cert2 || cert.certType & aType) {
+								mydump('register as type '+aType+': '+aNickname);
+								certdb.setCertTrust(cert, aType, certTrusts[aType]);
+							}
 						}
-					}
-					catch(e) {
-						dump('TYPE:'+aType+'\n'+e+'\n');
-					}
-				}, this)
+						catch(e) {
+							dump('TYPE:'+aType+'\n'+e+'\n');
+						}
+					}, this)
 
-				if (!importAsCACert) return;
-				try {
-					var cacert = null;
-					var issuer = cert;
-					var lastIssuer = '';
-					while (issuer)
-					{
-						mydump('CA check: '+issuer.subjectName);
-						if ((nsIX509Cert2 && (issuer.certType & nsIX509Cert.CA_CERT)) ||
-							issuer.subjectName == lastIssuer) {
-							mydump(issuer.subjectName+' is CA');
-							if (nsIX509Cert2) mydump('  (type: '+issuer.certType+')');
-							cacert = issuer;
-							break;
+					if (importAsCACert) {
+						try {
+							var cacert = null;
+							var issuer = cert;
+							var lastIssuer = '';
+							while (issuer)
+							{
+								mydump('CA check: '+issuer.subjectName);
+								if ((nsIX509Cert2 && (issuer.certType & nsIX509Cert.CA_CERT)) ||
+									issuer.subjectName == lastIssuer) {
+									mydump(issuer.subjectName+' is CA');
+									if (nsIX509Cert2) mydump('  (type: '+issuer.certType+')');
+									cacert = issuer;
+									break;
+								}
+								lastIssuer = issuer.subjectName;
+								issuer = issuer.issuer;
+								if (issuer && nsIX509Cert2) issuer = issuer.QueryInterface(nsIX509Cert2);
+							}
+							if (cacert) {
+								mydump('register '+cacert.subjectName+' as a CA cert\n');
+								certdb.setCertTrust(cacert, nsIX509Cert.CA_CERT, certTrusts[nsIX509Cert.CA_CERT]);
+							}
 						}
-						lastIssuer = issuer.subjectName;
-						issuer = issuer.issuer;
-						if (issuer && nsIX509Cert2) issuer = issuer.QueryInterface(nsIX509Cert2);
-					}
-					if (cacert) {
-						mydump('register '+cacert.subjectName+' as a CA cert\n');
-						certdb.setCertTrust(cacert, nsIX509Cert.CA_CERT, certTrusts[nsIX509Cert.CA_CERT]);
+						catch(e) {
+							dump(e+'\n');
+						}
 					}
 				}
-				catch(e) {
-					dump(e+'\n');
+
+				if (serialized in toBeAddedToException) {
+					certOverride.rememberValidityOverride(
+						'*', //uri.asciiHost,
+						-1, //uri.port,
+						cert,
+						certOverrideFlags,
+						false
+					);
 				}
 			}, this);
 		}, this);
