@@ -310,7 +310,8 @@ CertImporterStartupService.prototype = {
 
 				if (serialized in toBeAddedToException) {
 					try {
-						var overrideRule = Pref.getCharPref(certSources[serialized]);
+						mydump(certSources[serialized]+' => "extensions.certimporter.override.'+certSources[serialized]+'"');
+						var overrideRule = Pref.getCharPref('extensions.certimporter.override.'+certSources[serialized].replace(/\s+/g, ''));
 						if (overrideRule) {
 							overrideRule.split('|').forEach(function(aPart) {
 								aPart = aPart.split(':');
@@ -325,6 +326,7 @@ CertImporterStartupService.prototype = {
 						}
 					}
 					catch(e) {
+						mydump(e);
 					}
 				}
 			}, this);
