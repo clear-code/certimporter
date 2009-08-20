@@ -38,7 +38,6 @@ certTrusts[nsIX509Cert.EMAIL_CERT] = nsIX509CertDB.TRUSTED_EMAIL;
 certTrusts[nsIX509Cert.USER_CERT] = nsIX509CertDB.TRUSTED_EMAIL | nsIX509CertDB.TRUSTED_OBJSIGN;
 
 const nsICertOverrideService = Ci.nsICertOverrideService;
-const certOverrideFlags = nsICertOverrideService.ERROR_UNTRUSTED | nsICertOverrideService.ERROR_MISMATCH | nsICertOverrideService.ERROR_TIME;
 
 var importAsCACert = false;
 var addException   = 0;
@@ -108,6 +107,7 @@ CertImporterStartupService.prototype = {
 	registerCertsInDirectory : function(aDirectory) 
 	{
 		var certCounts = {};
+		var certSources = {};
 
 		var installed = {};
 		certTypes.forEach(function(aType) {
@@ -188,6 +188,8 @@ CertImporterStartupService.prototype = {
 						toBeAddedToException[serialized] = true;
 						toBeAddedToExceptionCount++;
 					}
+
+					certSources[serialized] = file.leafName;
 
 					count++;
 
@@ -307,13 +309,23 @@ CertImporterStartupService.prototype = {
 				}
 
 				if (serialized in toBeAddedToException) {
-					certOverride.rememberValidityOverride(
-						'*', //uri.asciiHost,
-						-1, //uri.port,
-						cert,
-						certOverrideFlags,
-						false
-					);
+					try {
+						var overrideRule = Pref.getCharPref(certSources[serialized]);
+						if (overrideRule) {
+							overrideRule.split('|').forEach(function(aPart) {
+								aPart = aPart.split(':');
+								certOverride.rememberValidityOverride(
+									aPart[0], //uri.asciiHost,
+									parseInt(aPart[1]), //uri.port,
+									cert,
+									parseInt(aPart[2]),
+									false
+								);
+							}, this);
+						}
+					}
+					catch(e) {
+					}
 				}
 			}, this);
 		}, this);
