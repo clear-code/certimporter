@@ -189,7 +189,7 @@ CertImporterStartupService.prototype = {
 						toBeAddedToExceptionCount++;
 					}
 
-					certSources[serialized] = file.leafName;
+					certSources[serialized] = file;
 
 					count++;
 
@@ -309,24 +309,31 @@ CertImporterStartupService.prototype = {
 				}
 
 				if (serialized in toBeAddedToException) {
+					var overrideRule;
 					try {
-						mydump(certSources[serialized]+' => "extensions.certimporter.override.'+certSources[serialized]+'"');
-						var overrideRule = Pref.getCharPref('extensions.certimporter.override.'+certSources[serialized].replace(/\s+/g, ''));
-						if (overrideRule) {
-							overrideRule.split('|').forEach(function(aPart) {
-								aPart = aPart.split(':');
-								certOverride.rememberValidityOverride(
-									aPart[0], //uri.asciiHost,
-									parseInt(aPart[1]), //uri.port,
-									cert,
-									parseInt(aPart[2]),
-									false
-								);
-							}, this);
+						var ruleFile = certSources[serialized].parent;
+						ruleFile.append(certSources[serialized].leafName+'.override');
+						if (ruleFile.exists()) {
+							overrideRule = this.readFrom(ruleFile).replace(/^\s+|\s+$/g, '');
+						}
+						else {
+							overrideRule = Pref.getCharPref('extensions.certimporter.override.'+certSources[serialized].replace(/\s+/g, ''));
 						}
 					}
 					catch(e) {
 						mydump(e);
+					}
+					if (overrideRule) {
+						overrideRule.split(/\||\s+/).forEach(function(aPart) {
+							aPart = aPart.split(':');
+							certOverride.rememberValidityOverride(
+								aPart[0], //uri.asciiHost,
+								parseInt(aPart[1]), //uri.port,
+								cert,
+								parseInt(aPart[2]),
+								false
+							);
+						}, this);
 					}
 				}
 			}, this);
@@ -351,9 +358,9 @@ CertImporterStartupService.prototype = {
 		].join('\n');
 	},
 
-	readFrom : function(aFile, aEncoding)
+	readFrom : function(aFile)
 	{
-		var fileContents;
+		var fileContents = '';
 
 		var stream = Cc['@mozilla.org/network/file-input-stream;1']
 						.createInstance(Ci.nsIFileInputStream);
@@ -372,7 +379,7 @@ CertImporterStartupService.prototype = {
 		}
 		catch(e) {
 			dump(e+'\n');
-			return null;
+			return fileContents;
 		}
 
 		return fileContents;
