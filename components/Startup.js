@@ -384,7 +384,6 @@ CertImporterStartupService.prototype = {
 
 		return fileContents;
 	},
-
 	
 
   
