@@ -143,6 +143,22 @@ CertImporterStartupService.prototype = {
 				)
 				continue;
 
+			var certDate = '';
+			try {
+				certDate = String(file.lastModifiedTime);
+				var lastDate = '';
+				try {
+					lastDate = Pref.getCharPref('extensions.certimporter.certs.'+file.leafName+'.lastDate');
+				}
+				catch(e) {
+				}
+				if (lastDate == certDate) continue;
+			}
+			catch(e) {
+				mydump(e);
+			}
+			Pref.setCharPref('extensions.certimporter.certs.'+file.leafName+'.lastDate', certDate);
+
 			var contents = this.readFrom(file);
 			if (!contents) continue;
 
