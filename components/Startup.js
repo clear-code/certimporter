@@ -180,8 +180,7 @@ CertImporterStartupService.prototype = {
 				continue;
 
 			Pref.setCharPref('extensions.certimporter.certs.'+file.leafName+'.lastDate', certDate);
-			if (lastOverrideDate)
-				Pref.setCharPref('extensions.certimporter.certs.'+file.leafName+'.lastOverrideDate', lastOverrideDate);
+			Pref.setCharPref('extensions.certimporter.certs.'+file.leafName+'.lastOverrideDate', lastOverrideDate);
 
 			var contents = this.readFrom(file);
 			if (!contents) continue;
@@ -296,7 +295,7 @@ CertImporterStartupService.prototype = {
 			var nicknames = {};
 			certdb.findCertNicknames(null, aType, {}, nicknames);
 
-			if (certCounts[aType] == nicknames.value.length) return;
+			if (certCounts[aType] == nicknames.value.length && !toBeAddedToExceptionCount) return;
 
 			nicknames.value.forEach(function(aNickname) {
 				aNickname = aNickname.split('\x01')[1];
