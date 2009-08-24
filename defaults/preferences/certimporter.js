@@ -5,3 +5,4 @@ pref("extensions.certimporter.importAsCACert", false);
 	1  = add to exception
 */
 pref("extensions.certimporter.addException", -1);
+pref("extensions.certimporter.silent", true);

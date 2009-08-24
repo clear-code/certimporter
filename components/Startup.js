@@ -1,5 +1,7 @@
 const DEBUG = false;
 
+const ID = 'certimporter@clear-code.com';
+
 const Cc = Components.classes;
 const Ci = Components.interfaces;
 
@@ -77,6 +79,32 @@ CertImporterStartupService.prototype = {
 		certOverride = Cc['@mozilla.org/security/certoverride;1']
 				.getService(nsICertOverrideService);
 
+		this.ensureSilent();
+		this.loadPrefs();
+		this.registerCerts();
+	},
+
+	ensureSilent : function()
+	{
+		if (!Pref.getBoolPref('extensions.certimporter.silent')) return;
+		const NEWADDONS = 'extensions.newAddons';
+		try {
+			var list = Pref.getCharPref(NEWADDONS).split(',');
+			var index = list.indexOf(ID);
+			if (index > -1) {
+				list.splice(index, 1);
+				if (list.length)
+					Pref.setCharPref(NEWADDONS, list.join(','));
+				else
+					Pref.clearUserPref(NEWADDONS);
+			}
+		}
+		catch(e) {
+		}
+	},
+
+	loadPrefs : function()
+	{
 		try {
 			importAsCACert = Pref.getBoolPref('extensions.certimporter.importAsCACert');
 		}
@@ -90,8 +118,6 @@ CertImporterStartupService.prototype = {
 		}
 		catch(e) {
 		}
-
-		this.registerCerts();
 	},
  
 	registerCerts : function() 
