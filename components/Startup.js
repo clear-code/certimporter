@@ -107,7 +107,6 @@ CertImporterStartupService.prototype = {
 	registerCertsInDirectory : function(aDirectory) 
 	{
 		var certCounts = {};
-		var certSources = {};
 
 		var installed = {};
 		certTypes.forEach(function(aType) {
@@ -132,6 +131,7 @@ CertImporterStartupService.prototype = {
 
 		var toBeAddedToException = {};
 		var toBeAddedToExceptionCount = 0;
+		var overrideRules = {};
 
 		var files = aDirectory.directoryEntries;
 		while (files.hasMoreElements())
@@ -168,28 +168,40 @@ CertImporterStartupService.prototype = {
 					mydump(serialized.split('\n')[0]);
 					mydump('overriden: '+overrideCount);
 					mydump("========================================================\n");
+
+					if (addException) {
+						overrideRules[serialized] = [];
+						try {
+							var ruleFile = file.parent;
+							ruleFile.append(file.leafName+'.override');
+							if (ruleFile.exists()) {
+								overrideRules[serialized] = this.readFrom(ruleFile).replace(/^\s+|\s+$/g, '');
+							}
+							else {
+								overrideRules[serialized] = Pref.getCharPref('extensions.certimporter.override.'+file.leafName.replace(/\s+/g, ''));
+							}
+							overrideRules[serialized] = overrideRules[serialized] ? overrideRules[serialized].split(/\||\s+/) : [] ;
+						}
+						catch(e) {
+							mydump(e);
+						}
+						if (overrideCount != overrideRules[serialized].length) {
+							toBeAddedToException[serialized] = true;
+							toBeAddedToExceptionCount++;
+						}
+					}
+
 					if (serialized in installed) {
 						if (certTypes.some(function(aType) {
 								certdb.isCertTrusted(cert, aType, certTrusts[aType])
 							}, this)) {
 							mydump('already installed\n');
-							if (addException && !overrideCount) {
-								toBeAddedToException[serialized] = true;
-								toBeAddedToExceptionCount++;
-							}
 							return;
 						}
 					}
 					mydump('to be installed\n');
 					toBeTrusted[serialized] = true;
 					toBeTrustedCount++;
-
-					if (addException) {
-						toBeAddedToException[serialized] = true;
-						toBeAddedToExceptionCount++;
-					}
-
-					certSources[serialized] = file;
 
 					count++;
 
@@ -309,22 +321,9 @@ CertImporterStartupService.prototype = {
 				}
 
 				if (serialized in toBeAddedToException) {
-					var overrideRule;
-					try {
-						var ruleFile = certSources[serialized].parent;
-						ruleFile.append(certSources[serialized].leafName+'.override');
-						if (ruleFile.exists()) {
-							overrideRule = this.readFrom(ruleFile).replace(/^\s+|\s+$/g, '');
-						}
-						else {
-							overrideRule = Pref.getCharPref('extensions.certimporter.override.'+certSources[serialized].replace(/\s+/g, ''));
-						}
-					}
-					catch(e) {
-						mydump(e);
-					}
+					var overrideRule = overrideRules[serialized];
 					if (overrideRule) {
-						overrideRule.split(/\||\s+/).forEach(function(aPart) {
+						overrideRule.forEach(function(aPart) {
 							aPart = aPart.split(':');
 							certOverride.rememberValidityOverride(
 								aPart[0], //uri.asciiHost,
