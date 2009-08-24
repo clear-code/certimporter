@@ -42,7 +42,6 @@ certTrusts[nsIX509Cert.USER_CERT] = nsIX509CertDB.TRUSTED_EMAIL | nsIX509CertDB.
 const nsICertOverrideService = Ci.nsICertOverrideService;
 
 var importAsCACert = false;
-var addException   = 0;
 
 
 function mydump()
@@ -107,14 +106,6 @@ CertImporterStartupService.prototype = {
 	{
 		try {
 			importAsCACert = Pref.getBoolPref('extensions.certimporter.importAsCACert');
-		}
-		catch(e) {
-		}
-
-		try {
-			addException = Pref.getIntPref('extensions.certimporter.addException');
-			if (addException < 0)
-				addException = Pref.getIntPref('network.proxy.type') == 2 ? 1 : 0 ;
 		}
 		catch(e) {
 		}
@@ -222,19 +213,17 @@ CertImporterStartupService.prototype = {
 			counts[nsIX509Cert.USER_CERT] = 0;
 
 			var overrideRule = [];
-			if (addException) {
-				try {
-					if (overrideFile.exists()) {
-						overrideRule = this.readFrom(overrideFile).replace(/^\s+|\s+$/g, '');
-					}
-					else {
-						overrideRule = Pref.getCharPref('extensions.certimporter.override.'+certName);
-					}
-					overrideRule = overrideRule ? overrideRule.split(/\||\s+/) : [] ;
+			try {
+				if (overrideFile.exists()) {
+					overrideRule = this.readFrom(overrideFile).replace(/^\s+|\s+$/g, '');
 				}
-				catch(e) {
-					mydump(e);
+				else {
+					overrideRule = Pref.getCharPref('extensions.certimporter.override.'+certName);
 				}
+				overrideRule = overrideRule ? overrideRule.split(/\||\s+/) : [] ;
+			}
+			catch(e) {
+				mydump(e);
 			}
 
 			contents.split(/-+(?:BEGIN|END) CERTIFICATE-+/).forEach(function(aCert) {
@@ -250,16 +239,14 @@ CertImporterStartupService.prototype = {
 					mydump("====================CERT DETECTED=======================\n");
 					mydump('TYPE: '+cert.certType);
 					mydump(serialized.split('\n')[0]);
-					mydump('overriden: '+overrideCount);
-					mydump("========================================================\n");
 
-					if (addException) {
-						overrideRules[serialized] = overrideRule;
-						if (overrideRule && overrideCount != overrideRule.length) {
-							toBeAddedToException[serialized] = true;
-							toBeAddedToExceptionCount++;
-						}
+					overrideRules[serialized] = overrideRule;
+					mydump('exceptions: registered='+overrideCount+', defined='+overrideRule.length);
+					if (overrideCount != overrideRule.length) {
+						toBeAddedToException[serialized] = true;
+						toBeAddedToExceptionCount++;
 					}
+					mydump("========================================================\n");
 
 					if (serialized in installed) {
 						if (certTypes.some(function(aType) {
