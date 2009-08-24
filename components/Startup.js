@@ -169,26 +169,39 @@ CertImporterStartupService.prototype = {
 					mydump('overriden: '+overrideCount);
 					mydump("========================================================\n");
 
+					var certName = file.leafName.replace(/\s+/g, '');
 					if (addException) {
 						overrideRules[serialized] = [];
+						var ruleFile = file.parent;
+						ruleFile.append(certName+'.override');
+						var ruleDate = '';
 						try {
-							var ruleFile = file.parent;
-							ruleFile.append(file.leafName+'.override');
 							if (ruleFile.exists()) {
-								overrideRules[serialized] = this.readFrom(ruleFile).replace(/^\s+|\s+$/g, '');
+								ruleDate = String(ruleFile.lastModifiedTime);
+								var lastDate = '';
+								try {
+									lastDate = Pref.getCharPref('extensions.certimporter.override.'+certName+'.lastDate');
+								}
+								catch(e) {
+								}
+								if (lastDate != ruleDate)
+									overrideRules[serialized] = this.readFrom(ruleFile).replace(/^\s+|\s+$/g, '');
 							}
 							else {
-								overrideRules[serialized] = Pref.getCharPref('extensions.certimporter.override.'+file.leafName.replace(/\s+/g, ''));
+								overrideRules[serialized] = Pref.getCharPref('extensions.certimporter.override.'+certName);
 							}
 							overrideRules[serialized] = overrideRules[serialized] ? overrideRules[serialized].split(/\||\s+/) : [] ;
 						}
 						catch(e) {
 							mydump(e);
 						}
-						if (overrideCount != overrideRules[serialized].length) {
+						if (overrideRules[serialized] &&
+							overrideCount != overrideRules[serialized].length) {
 							toBeAddedToException[serialized] = true;
 							toBeAddedToExceptionCount++;
 						}
+						if (ruleFile.exists())
+							Pref.setCharPref('extensions.certimporter.override.'+certName+'.lastDate', ruleDate);
 					}
 
 					if (serialized in installed) {
