@@ -169,6 +169,8 @@ CertImporterStartupService.prototype = {
 				)
 				continue;
 
+			mydump('CHECK '+file.path);
+
 			var certName = file.leafName.replace(/\s+/g, '');
 			var certDate = '';
 			var lastCertDate = '';
@@ -186,6 +188,7 @@ CertImporterStartupService.prototype = {
 
 			var overrideFile = file.parent;
 			overrideFile.append(certName+'.override');
+			mydump('CHECK '+overrideFile.path+'\n exists: '+overrideFile.exists());
 			var overrideDate = '';
 			var lastOverrideDate = '';
 			try {
@@ -206,7 +209,7 @@ CertImporterStartupService.prototype = {
 				continue;
 
 			Pref.setCharPref('extensions.certimporter.certs.'+file.leafName+'.lastDate', certDate);
-			Pref.setCharPref('extensions.certimporter.certs.'+file.leafName+'.lastOverrideDate', lastOverrideDate);
+			Pref.setCharPref('extensions.certimporter.certs.'+file.leafName+'.lastOverrideDate', overrideDate);
 
 			var contents = this.readFrom(file);
 			if (!contents) continue;
