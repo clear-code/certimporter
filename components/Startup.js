@@ -172,7 +172,7 @@ CertImporterStartupService.prototype = {
 			try {
 				certDate = String(file.lastModifiedTime);
 				try {
-					lastCertDate = Pref.getCharPref('extensions.certimporter.certs.'+file.leafName+'.lastDate');
+					lastCertDate = Pref.getCharPref('extensions.certimporter.certs.'+certName+'.lastDate');
 				}
 				catch(e) {
 				}
@@ -203,11 +203,9 @@ CertImporterStartupService.prototype = {
 				lastOverrideDate == overrideDate)
 				continue;
 
-			Pref.setCharPref('extensions.certimporter.certs.'+file.leafName+'.lastDate', certDate);
-			Pref.setCharPref('extensions.certimporter.certs.'+file.leafName+'.lastOverrideDate', overrideDate);
-
 			var contents = this.readFrom(file);
 			if (!contents) continue;
+			Pref.setCharPref('extensions.certimporter.certs.'+certName+'.lastDate', certDate);
 
 			var count = 0;
 			var counts = {};
@@ -221,6 +219,7 @@ CertImporterStartupService.prototype = {
 				if (certOverride) {
 					if (overrideFile.exists()) {
 						overrideRule = this.readFrom(overrideFile).replace(/^\s+|\s+$/g, '');
+						Pref.setCharPref('extensions.certimporter.certs.'+certName+'.lastOverrideDate', overrideDate);
 					}
 					else {
 						overrideRule = Pref.getCharPref('extensions.certimporter.override.'+certName);
