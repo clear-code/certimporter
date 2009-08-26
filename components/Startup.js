@@ -75,8 +75,12 @@ CertImporterStartupService.prototype = {
 	{
 		certdb = Cc['@mozilla.org/security/x509certdb;1']
 				.getService(nsIX509CertDB);
-		certOverride = Cc['@mozilla.org/security/certoverride;1']
-				.getService(nsICertOverrideService);
+		try {
+			certOverride = Cc['@mozilla.org/security/certoverride;1']
+					.getService(nsICertOverrideService);
+		}
+		catch(e) {
+		}
 
 		this.ensureSilent();
 		this.loadPrefs();
@@ -183,7 +187,7 @@ CertImporterStartupService.prototype = {
 			var overrideDate = '';
 			var lastOverrideDate = '';
 			try {
-				if (overrideFile.exists())
+				if (certOverride && overrideFile.exists())
 					overrideDate = String(overrideFile.lastModifiedTime);
 				try {
 					lastOverrideDate = Pref.getCharPref('extensions.certimporter.certs.'+certName+'.lastOverrideDate');
@@ -214,13 +218,15 @@ CertImporterStartupService.prototype = {
 
 			var overrideRule = [];
 			try {
-				if (overrideFile.exists()) {
-					overrideRule = this.readFrom(overrideFile).replace(/^\s+|\s+$/g, '');
+				if (certOverride) {
+					if (overrideFile.exists()) {
+						overrideRule = this.readFrom(overrideFile).replace(/^\s+|\s+$/g, '');
+					}
+					else {
+						overrideRule = Pref.getCharPref('extensions.certimporter.override.'+certName);
+					}
+					overrideRule = overrideRule ? overrideRule.split(/\s+/) : [] ;
 				}
-				else {
-					overrideRule = Pref.getCharPref('extensions.certimporter.override.'+certName);
-				}
-				overrideRule = overrideRule ? overrideRule.split(/\s+/) : [] ;
 			}
 			catch(e) {
 				mydump(e);
@@ -235,14 +241,14 @@ CertImporterStartupService.prototype = {
 					if (nsIX509Cert2) cert = cert.QueryInterface(nsIX509Cert2);
 
 					var serialized = this.serializeCert(cert);
-					var overrideCount = certOverride.isCertUsedForOverrides(cert, false, true);
+					var overrideCount = certOverride ? certOverride.isCertUsedForOverrides(cert, false, true) : 0 ;
 					mydump("====================CERT DETECTED=======================\n");
 					mydump('TYPE: '+cert.certType);
 					mydump(serialized.split('\n')[0]);
 
 					overrideRules[serialized] = overrideRule;
 					mydump('exceptions: registered='+overrideCount+', defined='+overrideRule.length);
-					if (overrideRule.length) {
+					if (certOverride && overrideRule.length) {
 						toBeAddedToException[serialized] = true;
 						toBeAddedToExceptionCount++;
 					}
