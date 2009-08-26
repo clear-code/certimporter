@@ -220,7 +220,7 @@ CertImporterStartupService.prototype = {
 				else {
 					overrideRule = Pref.getCharPref('extensions.certimporter.override.'+certName);
 				}
-				overrideRule = overrideRule ? overrideRule.split(/\||\s+/) : [] ;
+				overrideRule = overrideRule ? overrideRule.split(/\s+/) : [] ;
 			}
 			catch(e) {
 				mydump(e);
@@ -242,7 +242,7 @@ CertImporterStartupService.prototype = {
 
 					overrideRules[serialized] = overrideRule;
 					mydump('exceptions: registered='+overrideCount+', defined='+overrideRule.length);
-					if (overrideCount != overrideRule.length) {
+					if (overrideRule.length) {
 						toBeAddedToException[serialized] = true;
 						toBeAddedToExceptionCount++;
 					}
@@ -381,14 +381,30 @@ CertImporterStartupService.prototype = {
 					var overrideRule = overrideRules[serialized];
 					if (overrideRule) {
 						overrideRule.forEach(function(aPart) {
-							aPart = aPart.split(':');
-							certOverride.rememberValidityOverride(
-								aPart[0], //uri.asciiHost,
-								parseInt(aPart[1]), //uri.port,
-								cert,
-								parseInt(aPart[2]),
-								false
-							);
+							var host, port, newFlags;
+							[host, port, newFlags] = aPart.split(':');
+							port     = parseInt(port);
+							newFlags = parseInt(newFlags);
+
+							var hash = {}, fingerprint = {}, flags = {}, temporary = {};
+							if (
+								certOverride.getValidityOverride(
+									host, port,
+									hash, fingerprint, flags, temporary
+								) &&
+								flags.value != newFlags
+								) {
+								certOverride.clearValidityOverride(host, port);
+							}
+
+							if (newFlags) {
+								certOverride.rememberValidityOverride(
+									host, port,
+									cert,
+									newFlags,
+									false
+								);
+							}
 						}, this);
 					}
 				}
