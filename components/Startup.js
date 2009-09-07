@@ -41,7 +41,7 @@ certTrusts[nsIX509Cert.USER_CERT] = nsIX509CertDB.TRUSTED_EMAIL | nsIX509CertDB.
 
 const nsICertOverrideService = Ci.nsICertOverrideService;
 
-var importAsCACert = false;
+var importAsCACert = [ '*' : false ];
 
 
 function mydump()
@@ -108,11 +108,14 @@ CertImporterStartupService.prototype = {
 
 	loadPrefs : function()
 	{
-		try {
-			importAsCACert = Pref.getBoolPref('extensions.certimporter.importAsCACert');
-		}
-		catch(e) {
-		}
+		const prefix = 'extensions.certimporter.importAsCACert.';
+		Pref.getChildList(prefix, {}).forEach(function(aPref) {
+			try {
+				importAsCACert[aPref.replace(prefix, '')] = Pref.getBoolPref(aPref);
+			}
+			catch(e) {
+			}
+		}, this);
 	},
  
 	registerCerts : function() 
@@ -149,6 +152,7 @@ CertImporterStartupService.prototype = {
 
 		var toBeTrusted = {};
 		var toBeTrustedCount = 0;
+		var certFiles = {};
 
 		var toBeAddedToException = {};
 		var toBeAddedToExceptionCount = 0;
@@ -245,6 +249,7 @@ CertImporterStartupService.prototype = {
 					mydump('TYPE: '+cert.certType);
 					mydump(serialized.split('\n')[0]);
 
+					certFiles[serialized] = certName;
 					overrideRules[serialized] = overrideRule;
 					mydump('exceptions: registered='+overrideCount+', defined='+overrideRule.length);
 					if (certOverride && overrideRule.length) {
@@ -352,24 +357,33 @@ CertImporterStartupService.prototype = {
 						}
 					}, this)
 
-					if (importAsCACert) {
+					if (
+						certFiles[serialized] in importAsCACert ?
+							importAsCACert[certFiles[serialized]] :
+							importAsCACert['*']
+						) {
 						try {
 							var cacert = null;
-							var issuer = cert;
-							var lastIssuer = '';
-							while (issuer)
-							{
-								mydump('CA check: '+issuer.subjectName);
-								if ((nsIX509Cert2 && (issuer.certType & nsIX509Cert.CA_CERT)) ||
-									issuer.subjectName == lastIssuer) {
-									mydump(issuer.subjectName+' is CA');
-									if (nsIX509Cert2) mydump('  (type: '+issuer.certType+')');
-									cacert = issuer;
-									break;
+							if (certFiles[serialized] in importAsCACert) {
+								cacert = cert;
+							}
+							else {
+								var issuer = cert;
+								var lastIssuer = '';
+								while (issuer)
+								{
+									mydump('CA check: '+issuer.subjectName);
+									if ((nsIX509Cert2 && (issuer.certType & nsIX509Cert.CA_CERT)) ||
+										issuer.subjectName == lastIssuer) {
+										mydump(issuer.subjectName+' is CA');
+										if (nsIX509Cert2) mydump('  (type: '+issuer.certType+')');
+										cacert = issuer;
+										break;
+									}
+									lastIssuer = issuer.subjectName;
+									issuer = issuer.issuer;
+									if (issuer && nsIX509Cert2) issuer = issuer.QueryInterface(nsIX509Cert2);
 								}
-								lastIssuer = issuer.subjectName;
-								issuer = issuer.issuer;
-								if (issuer && nsIX509Cert2) issuer = issuer.QueryInterface(nsIX509Cert2);
 							}
 							if (cacert) {
 								mydump('register '+cacert.subjectName+' as a CA cert\n');
