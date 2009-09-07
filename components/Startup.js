@@ -41,7 +41,7 @@ certTrusts[nsIX509Cert.USER_CERT] = nsIX509CertDB.TRUSTED_EMAIL | nsIX509CertDB.
 
 const nsICertOverrideService = Ci.nsICertOverrideService;
 
-var importAsCACert = [ '*' : false ];
+var importAsCACert = { '*' : false };
 
 
 function mydump()
