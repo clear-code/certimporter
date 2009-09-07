@@ -42,6 +42,7 @@ certTrusts[nsIX509Cert.USER_CERT] = nsIX509CertDB.TRUSTED_EMAIL | nsIX509CertDB.
 const nsICertOverrideService = Ci.nsICertOverrideService;
 
 var importAsCACert = { '*' : false };
+var allowRegisterAgain = false;
 
 
 function mydump()
@@ -116,6 +117,12 @@ CertImporterStartupService.prototype = {
 			catch(e) {
 			}
 		}, this);
+
+		try {
+			allowRegisterAgain = Pref.getBoolPref('extensions.certimporter.allowRegisterAgain');
+		}
+		catch(e) {
+		}
 	},
  
 	registerCerts : function() 
@@ -203,7 +210,7 @@ CertImporterStartupService.prototype = {
 				mydump(e);
 			}
 
-			if (lastCertDate == certDate &&
+			if ((!allowRegisterAgain && lastCertDate == certDate) &&
 				lastOverrideDate == overrideDate)
 				continue;
 
