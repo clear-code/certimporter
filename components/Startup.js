@@ -51,6 +51,11 @@ function mydump()
 	var str = Array.slice(arguments).join('\n');
 	if (str.charAt(str.length-1) != '\n') str += '\n';
 	dump(str);
+	log(str);
+}
+function log(aMessage)
+{
+	ObserverService.notifyObservers(null, 'log', aMessage.replace(/^/gm, '[certimporter] '));
 }
  
 function CertImporterStartupService() { 
