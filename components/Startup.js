@@ -55,7 +55,7 @@ function mydump()
 }
 function log(aMessage)
 {
-	ObserverService.notifyObservers(null, 'log', aMessage.replace(/^/gm, '[certimporter] '));
+	ObserverService.notifyObservers(null, 'log', aMessage.replace(/[\r\n]+$/, '').replace(/^/gm, '[certimporter] '));
 }
  
 function CertImporterStartupService() { 

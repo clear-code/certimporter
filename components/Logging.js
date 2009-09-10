@@ -3,7 +3,7 @@
      ObserverService.notifyObservers(null, 'log', 'message to be logged');
 */
 
-const LOG_DIRECTORY_KEY = 'ProfD'; // 'CurProcD';
+const LOG_DIRECTORY_KEY = 'Desk'; // 'CurProcD';
 
 const ObserverService = Components 
 		.classes['@mozilla.org/observer-service;1']
@@ -72,18 +72,21 @@ LoggingService.prototype = {
 
 	logWithDate : function(aMessage) 
 	{
-		var output = [];
 		var date = new Date();
-		output.push(this.fillWithZero(date.getHours(), 2));
-		output.push(':');
-		output.push(this.fillWithZero(date.getMinutes(), 2));
-		output.push(':');
-		output.push(this.fillWithZero(date.getSeconds(), 2));
-		output.push('.');
-		output.push(this.fillWithZero(date.getMilliseconds(), 3));
-		output.push(' ');
-		output.push(aMessage);
-		this.log(output.join(''));
+		var prefix = [
+				this.fillWithZero(date.getHours(), 2),
+				':',
+				this.fillWithZero(date.getMinutes(), 2),
+				':',
+				this.fillWithZero(date.getSeconds(), 2),
+				'.',
+				this.fillWithZero(date.getMilliseconds(), 3),
+				' '
+			].join('');
+		aMessage = aMessage
+						.replace(/[\r\n]+$/g, '')
+						.replace(/^/gm, prefix);
+		this.log(aMessage);
 	},
 
 	log : function(aMessage)
