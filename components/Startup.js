@@ -551,7 +551,7 @@ var gModule = {
 
 try {
 	Components.utils.import('resource://gre/modules/XPCOMUtils.jsm');
-	var NSGetFactory = XPCOMUtils.generateNSGetFactory([AutoProxyChangerStartupService]);
+	var NSGetFactory = XPCOMUtils.generateNSGetFactory([CertImporterStartupService]);
 }
 catch(e) {
 	var NSGetModule = function(aCompMgr, aFileSpec) {
