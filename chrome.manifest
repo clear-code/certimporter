@@ -1,3 +1,4 @@
 component	{b0e74752-55c5-4d1a-b675-67726df8c273}	components/Startup.js
 contract	@clear-code.com/certimporter/startup;1	{b0e74752-55c5-4d1a-b675-67726df8c273}
+category	profile-after-change	CertImporterStartupService	@clear-code.com/certimporter/startup;1
 
