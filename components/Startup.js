@@ -61,6 +61,9 @@ function log(aMessage)
 function CertImporterStartupService() { 
 }
 CertImporterStartupService.prototype = {
+	classID          : kCID,
+	contractID       : kID,
+	classDescription : kNAME,
 	 
 	observe : function(aSubject, aTopic, aData) 
 	{
@@ -545,7 +548,13 @@ var gModule = {
 	}
 };
 
-function NSGetModule(aCompMgr, aFileSpec) {
-	return gModule;
+try {
+	Components.utils.import('resource://gre/modules/XPCOMUtils.jsm');
+	var NSGetFactory = XPCOMUtils.generateNSGetFactory([AutoProxyChangerStartupService]);
+}
+catch(e) {
+	var NSGetModule = function(aCompMgr, aFileSpec) {
+			return gModule;
+		};
 }
  
