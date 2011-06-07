@@ -7,7 +7,7 @@ const Ci = Components.interfaces;
 
 const kCID  = Components.ID('{b0e74752-55c5-4d1a-b675-67726df8c273}'); 
 const kID   = '@clear-code.com/certimporter/startup;1';
-const kNAME = "Cert Importer Startup Service";
+const kNAME = 'CertImporterStartupService';
 
 const ObserverService = Cc['@mozilla.org/observer-service;1']
 		.getService(Ci.nsIObserverService);
