@@ -64,6 +64,12 @@ CertImporterStartupService.prototype = {
 	classID          : kCID,
 	contractID       : kID,
 	classDescription : kNAME,
+
+	get isLegacyEnvironment() { // -Firefox 9 (possible -Firefox 4)
+		const XULAppInfo = Cc['@mozilla.org/xre/app-info;1'].getService(Ci.nsIXULAppInfo).QueryInterface(Ci.nsIXULRuntime);
+		const Comparator = Cc['@mozilla.org/xpcom/version-comparator;1'].getService(Ci.nsIVersionComparator);
+		return Comparator.compare(XULAppInfo.version, '10') < 0;
+	},
 	 
 	observe : function(aSubject, aTopic, aData) 
 	{
@@ -295,7 +301,7 @@ CertImporterStartupService.prototype = {
 							counts[aType]++;
 					}, this)
 					// hack to force-detect CA certs
-					if (cert.certType == nsIX509Cert.CA_CERT)
+					if (this.isLegacyEnvironment && cert.certType == nsIX509Cert.CA_CERT)
 						counts[nsIX509Cert.SERVER_CERT]++;
 				}
 				catch(e) {
@@ -319,8 +325,20 @@ CertImporterStartupService.prototype = {
 			}, this)
 			try {
 				if (type) {
-					mydump('IMPORT '+file.path+' as '+type);
-					certdb.importCertsFromFile(null, file, type);
+					if (
+						counts[nsIX509Cert.CA_CERT] &&
+						!this.isLegacyEnvironment &&
+						certName in importAsCACert ?
+							importAsCACert[certName] :
+							importAsCACert['*']
+						) {
+						mydump('IMPORT '+file.path+' as a CA cert');
+						certdb.importCertsFromFile(null, file, nsIX509Cert.CA_CERT);
+					}
+					else {
+						mydump('IMPORT '+file.path+' as '+type);
+						certdb.importCertsFromFile(null, file, type);
+					}
 				}
 				else {
 					mydump('SKIP '+file.path);
@@ -374,6 +392,7 @@ CertImporterStartupService.prototype = {
 					}, this)
 
 					if (
+						this.isLegacyEnvironment &&
 						certFiles[serialized] in importAsCACert ?
 							importAsCACert[certFiles[serialized]] :
 							importAsCACert['*']
