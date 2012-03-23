@@ -288,13 +288,16 @@ CertImporterStartupService.prototype = {
 					}
 					mydump("========================================================\n");
 
-					if (serialized in installed) {
+					try {
 						if (certTypes.some(function(aType) {
-								certdb.isCertTrusted(cert, aType, certTrusts[aType])
+								return certdb.isCertTrusted(cert, aType, certTrusts[aType]);
 							}, this)) {
 							mydump('already installed\n');
 							return;
 						}
+					}
+					catch(e) {
+						dump(e+'\n');
 					}
 					mydump('to be installed\n');
 					toBeTrusted[serialized] = true;
