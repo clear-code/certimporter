@@ -257,6 +257,7 @@ CertImporterStartupService.prototype = {
 				mydump(e);
 			}
 
+			var certs = [];
 			contents.split(/-+(?:BEGIN|END) CERTIFICATE-+/).forEach(function(aCert) {
 				aCert = aCert.replace(/\s/g, '');
 				if (!aCert) return;
@@ -269,9 +270,16 @@ CertImporterStartupService.prototype = {
 					var overrideCount = certOverride ? certOverride.isCertUsedForOverrides(cert, false, true) : 0 ;
 					mydump("====================CERT DETECTED=======================\n");
 					mydump('TYPE: '+cert.certType);
+					mydump('FINGERPRINT: '+cert.sha1Fingerprint);
 					mydump(serialized.split('\n')[0]);
 
 					certFiles[serialized] = certName;
+					certs.push(cert);
+
+					var fingerprints = Pref.getCharPref('extensions.certimporter.registeringCerts');
+					fingerprints = fingerprints ? fingerprints+'\n'+cert.sha1Fingerprint : cert.sha1Fingerprint ;
+					Pref.setCharPref('extensions.certimporter.registeringCerts', fingerprints);
+
 					overrideRules[serialized] = overrideRule;
 					mydump('exceptions: registered='+overrideCount+', defined='+overrideRule.length);
 					if (certOverride && overrideRule.length) {
@@ -316,7 +324,9 @@ CertImporterStartupService.prototype = {
 
 			var type = null;
 			certTypes.some(function(aType) {
-				if (aType == nsIX509Cert.CA_CERT) return false;
+				if (aType == nsIX509Cert.CA_CERT && this.isLegacyEnvironment) {
+					return false;
+				}
 				if (!nsIX509Cert2 || counts[aType]) {
 					type = aType;
 					return true;
@@ -348,6 +358,8 @@ CertImporterStartupService.prototype = {
 				dump('TYPE:'+type+'\n'+e+'\n');
 			}
 		}
+
+		Pref.clearUserPref('extensions.certimporter.registeringCerts');
 
 		if (!toBeTrustedCount && !toBeAddedToExceptionCount) return;
 
