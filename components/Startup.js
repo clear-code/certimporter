@@ -248,7 +248,11 @@ CertImporterStartupService.prototype = {
 						Pref.setCharPref('extensions.certimporter.certs.'+certName+'.lastOverrideDate', overrideDate);
 					}
 					else {
-						overrideRule = Pref.getCharPref('extensions.certimporter.override.'+certName);
+						try {
+							overrideRule = Pref.getCharPref('extensions.certimporter.override.'+certName);
+						} catch(e) {
+							overrideRule = null;
+						}
 					}
 					overrideRule = overrideRule ? overrideRule.split(/\s+/) : [] ;
 				}
