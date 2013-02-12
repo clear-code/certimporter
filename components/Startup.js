@@ -41,7 +41,7 @@ certTrusts[nsIX509Cert.USER_CERT] = nsIX509CertDB.TRUSTED_EMAIL | nsIX509CertDB.
 
 const nsICertOverrideService = Ci.nsICertOverrideService;
 
-var importAsCACert = { '*' : false };
+var importAs = { '*' : 0 };
 var allowRegisterAgain = false;
 
 
@@ -53,8 +53,10 @@ function mydump()
 	dump(str);
 	log(str);
 }
+var gLog = [];
 function log(aMessage)
 {
+	gLog.push(aMessage);
 	ObserverService.notifyObservers(null, 'log', aMessage.replace(/[\r\n]+$/, '').replace(/^/gm, '[certimporter] '));
 }
  
@@ -64,12 +66,6 @@ CertImporterStartupService.prototype = {
 	classID          : kCID,
 	contractID       : kID,
 	classDescription : kNAME,
-
-	get isLegacyEnvironment() { // -Firefox 9 (possible -Firefox 4)
-		const XULAppInfo = Cc['@mozilla.org/xre/app-info;1'].getService(Ci.nsIXULAppInfo).QueryInterface(Ci.nsIXULRuntime);
-		const Comparator = Cc['@mozilla.org/xpcom/version-comparator;1'].getService(Ci.nsIVersionComparator);
-		return Comparator.compare(XULAppInfo.version, '10') < 0;
-	},
 	 
 	observe : function(aSubject, aTopic, aData) 
 	{
@@ -124,10 +120,10 @@ CertImporterStartupService.prototype = {
 
 	loadPrefs : function()
 	{
-		const prefix = 'extensions.certimporter.importAsCACert.';
+		const prefix = 'extensions.certimporter.importAs.';
 		Pref.getChildList(prefix, {}).forEach(function(aPref) {
 			try {
-				importAsCACert[aPref.replace(prefix, '')] = Pref.getBoolPref(aPref);
+				importAs[aPref.replace(prefix, '')] = Pref.getIntPref(aPref);
 			}
 			catch(e) {
 			}
@@ -192,7 +188,7 @@ CertImporterStartupService.prototype = {
 
 			mydump('CHECK '+file.path);
 
-			var certName = file.leafName.replace(/\s+/g, '');
+			var certName = file.leafName.replace(/^\s+|\s+$/g, '');
 			var certDate = '';
 			var lastCertDate = '';
 			try {
@@ -234,11 +230,6 @@ CertImporterStartupService.prototype = {
 			Pref.setCharPref('extensions.certimporter.certs.'+certName+'.lastDate', certDate);
 
 			var count = 0;
-			var counts = {};
-			counts[nsIX509Cert.CA_CERT] = 0;
-			counts[nsIX509Cert.SERVER_CERT] = 0;
-			counts[nsIX509Cert.EMAIL_CERT] = 0;
-			counts[nsIX509Cert.USER_CERT] = 0;
 
 			var overrideRule = [];
 			try {
@@ -309,15 +300,7 @@ CertImporterStartupService.prototype = {
 
 					count++;
 
-					certTypes.forEach(function(aType) {
-						if (!nsIX509Cert2 ||
-							!cert.certType ||
-							cert.certType & aType)
-							counts[aType]++;
-					}, this)
-					// hack to force-detect CA certs
-					if (this.isLegacyEnvironment && cert.certType == nsIX509Cert.CA_CERT)
-						counts[nsIX509Cert.SERVER_CERT]++;
+					importAs[certName] = cert.certType || importAs[certName] || 0;
 				}
 				catch(e) {
 					dump(e+'\n');
@@ -329,32 +312,24 @@ CertImporterStartupService.prototype = {
 				continue;
 			}
 
-			var type = null;
-			certTypes.some(function(aType) {
-				if (aType == nsIX509Cert.CA_CERT && this.isLegacyEnvironment) {
-					return false;
-				}
-				if (!nsIX509Cert2 || counts[aType]) {
-					type = aType;
-					return true;
-				}
-				return false;
-			}, this)
+			mydump('certName '+certName);
+			let type = certName in importAs ?
+					importAs[certName] :
+					importAs['*'] ;
+			mydump('type '+type);
 			try {
 				if (type) {
-					if (
-						counts[nsIX509Cert.CA_CERT] &&
-						!this.isLegacyEnvironment &&
-						certName in importAsCACert ?
-							importAsCACert[certName] :
-							importAsCACert['*']
-						) {
+					if (type & nsIX509Cert.CA_CERT) {
 						mydump('IMPORT '+file.path+' as a CA cert');
 						certdb.importCertsFromFile(null, file, nsIX509Cert.CA_CERT);
 					}
 					else {
-						mydump('IMPORT '+file.path+' as '+type);
-						certdb.importCertsFromFile(null, file, type);
+						certTypes.forEach(function(aType) {
+							if (type & aType) {
+								mydump('IMPORT '+file.path+' as '+aType);
+								certdb.importCertsFromFile(null, file, aType);
+							}
+						});
 					}
 				}
 				else {
@@ -409,45 +384,6 @@ CertImporterStartupService.prototype = {
 							dump('TYPE:'+aType+'\n'+e+'\n');
 						}
 					}, this)
-
-					if (
-						this.isLegacyEnvironment &&
-						certFiles[serialized] in importAsCACert ?
-							importAsCACert[certFiles[serialized]] :
-							importAsCACert['*']
-						) {
-						try {
-							var cacert = null;
-							if (certFiles[serialized] in importAsCACert) {
-								cacert = cert;
-							}
-							else {
-								var issuer = cert;
-								var lastIssuer = '';
-								while (issuer)
-								{
-									mydump('CA check: '+issuer.subjectName);
-									if ((nsIX509Cert2 && (issuer.certType & nsIX509Cert.CA_CERT)) ||
-										issuer.subjectName == lastIssuer) {
-										mydump(issuer.subjectName+' is CA');
-										if (nsIX509Cert2) mydump('  (type: '+issuer.certType+')');
-										cacert = issuer;
-										break;
-									}
-									lastIssuer = issuer.subjectName;
-									issuer = issuer.issuer;
-									if (issuer && nsIX509Cert2) issuer = issuer.QueryInterface(nsIX509Cert2);
-								}
-							}
-							if (cacert) {
-								mydump('register '+cacert.subjectName+' as a CA cert\n');
-								certdb.setCertTrust(cacert, nsIX509Cert.CA_CERT, certTrusts[nsIX509Cert.CA_CERT]);
-							}
-						}
-						catch(e) {
-							dump(e+'\n');
-						}
-					}
 				}
 
 				if (serialized in toBeAddedToException) {
@@ -483,6 +419,9 @@ CertImporterStartupService.prototype = {
 				}
 			}, this);
 		}, this);
+
+		if (DEBUG)
+			Cc['@mozilla.org/embedcomp/prompt-service;1'].getService(Ci.nsIPromptService).alert(null, 'log', gLog.join('\n'));
 	},
 
 	serializeCert : function(aCert)
