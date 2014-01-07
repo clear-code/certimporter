@@ -431,7 +431,7 @@ CertImporterStartupService.prototype = {
 		}, this);
 
 		if (DEBUG)
-			Cc['@mozilla.org/embedcomp/prompt-service;1'].getService(Ci.nsIPromptService).alert(null, 'log', gLog.join('\n'));
+			Cc['@mozilla.org/embedcomp/prompt-service;1'].getService(Ci.nsIPromptService).alert(null, 'log', gLog.join(''));
 	},
 
 	serializeCert : function(aCert)
