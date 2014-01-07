@@ -140,10 +140,20 @@ CertImporterStartupService.prototype = {
 	{
 		var defaults = DirectoryService.get('CurProcD', Ci.nsIFile);
 		defaults.append('defaults');
-		this.registerCertsInDirectory(defaults);
+		mydump('global1 '+defaults.path+' : '+defaults.exists());
+		if (defaults.exists())
+			this.registerCertsInDirectory(defaults);
+
+		defaults = DirectoryService.get('GreD', Ci.nsIFile);
+		defaults.append('defaults');
+		mydump('global2 '+defaults.path+' : '+defaults.exists());
+		if (defaults.exists())
+			this.registerCertsInDirectory(defaults);
 
 		var profile = DirectoryService.get('ProfD', Ci.nsIFile);
-		this.registerCertsInDirectory(profile);
+		mydump('private '+profile.path+' : '+profile.exists());
+		if (profile.exists())
+			this.registerCertsInDirectory(profile);
 	},
  
 	registerCertsInDirectory : function(aDirectory) 
