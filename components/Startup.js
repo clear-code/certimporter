@@ -310,7 +310,7 @@ CertImporterStartupService.prototype = {
 
 					count++;
 
-					importAs[certName] = cert.certType || importAs[certName] || 0;
+					importAs[certName] = importAs[certName] || cert.certType || 0;
 				}
 				catch(e) {
 					dump(e+'\n');
