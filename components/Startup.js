@@ -400,6 +400,10 @@ CertImporterStartupService.prototype = {
 					var overrideRule = overrideRules[serialized];
 					if (overrideRule) {
 						overrideRule.forEach(function(aPart) {
+							aPart = aPart.replace(/^\s+|\s+$/g, '');
+							if (/^\/\/|^\#/.test(aPart) ||
+								!/^[^:]+:\d+:\d+$/.test(aPart))
+								return;
 							var host, port, newFlags;
 							[host, port, newFlags] = aPart.split(':');
 							port     = parseInt(port);
