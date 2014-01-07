@@ -1,4 +1,4 @@
-content	certimporter	jar:chrome/certimporter.jar!/content/certimporter/
+content	certimporter	content/certimporter/
 overlay	chrome://pippki/content/downloadcert.xul	chrome://certimporter/content/downloadcert.xul
 
 component	{b0e74752-55c5-4d1a-b675-67726df8c273}	components/Startup.js
