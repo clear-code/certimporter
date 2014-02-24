@@ -3,6 +3,8 @@
 Put your cert files to the profile directory or %AppDir%/defaults/ (ex. "C:\Program Files (x86)\Mozilla Firefox\defaults").
 After you restart Firefox, cert files will be imported automatically.
 
+This is mainly desinged for corporate-use.
+
 ## Supported file types
 
 Supported certs are "PEM" format files, converted from DER X509 files.

@@ -3,6 +3,8 @@
 証明書ファイルを %AppDir%/defaults/ 以下（Windowsであれば「C:\Program Files (x86)\Mozilla Firefox\defaults」など）に置いて下さい。
 Firefoxを再起動すると、証明書が自動的にインポートされます。
 
+このアドオンは法人利用を前提に開発されています。
+
 ## 対応している証明書ファイルの種類
 
 DER X509形式から変換されたPEM形式のファイルにのみ対応しています。
