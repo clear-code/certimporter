@@ -7,13 +7,13 @@ After you restart Firefox, cert files will be imported automatically.
 
 Supported certs are "PEM" format files, converted from DER X509 files.
 You must put files with a suffix ".crt", ".cer", or ".pem".
-Sample certs are avialable at ./doc/*.pem
+Sample certs are avialable at ./doc/*.pem in the repository.
 
 Cert types are automatically detected. However, you can override the type via preferences.
-Sample configurations are avialable at ./doc/sample.js
+Sample configurations are avialable at ./doc/sample.js in the repository.
 
 ## Security exceptions
 
 If you put security exceptions for a cert file as "<the nmae of the cert file>.override" into the directory same to the cert file, then exceptions defined in the file will be automatically applied.
-Sample configurations are avialable at ./doc/newcert.pem.override
+Sample configurations are avialable at ./doc/newcert.pem.override in the repository.
 
