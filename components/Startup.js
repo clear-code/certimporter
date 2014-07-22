@@ -273,7 +273,8 @@ CertImporterStartupService.prototype = {
 
 				try {
 					var cert = certdb.constructX509FromBase64(aCert);
-					if (nsIX509Cert2) cert = cert.QueryInterface(nsIX509Cert2);
+					if (nsIX509Cert2)
+						cert = cert.QueryInterface(nsIX509Cert2);
 
 					var serialized = this.serializeCert(cert);
 					var overrideCount = certOverride ? certOverride.isCertUsedForOverrides(cert, false, true) : 0 ;
@@ -382,15 +383,15 @@ CertImporterStartupService.prototype = {
 				}
 
 				mydump('========= '+aNickname+' ===========');
-				if (nsIX509Cert2) {
+				if (nsIX509Cert2)
 					cert = cert.QueryInterface(nsIX509Cert2);
-					mydump('TYPE: '+cert.certType);
-				}
+
+				mydump('TYPE: '+cert.certType);
 
 				if (serialized in toBeTrusted) {
 					certTypes.forEach(function(aType) {
 						try {
-							if (!nsIX509Cert2 || cert.certType & aType) {
+							if (!('certType' in cert) || cert.certType & aType) {
 								mydump('register as type '+aType+': '+aNickname);
 								certdb.setCertTrust(cert, aType, certTrusts[aType]);
 							}
