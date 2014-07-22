@@ -28,7 +28,6 @@ var certOverride;
 const nsIX509CertDB = Ci.nsIX509CertDB;
 const nsIX509Cert   = Ci.nsIX509Cert;
 const nsIX509Cert2  = 'nsIX509Cert2' in Ci ? Ci.nsIX509Cert2 : null ;
-const nsIX509Cert3  = 'nsIX509Cert3' in Ci ? Ci.nsIX509Cert3 : null ;
 
 const certTypes = [
 		nsIX509Cert.CA_CERT,
