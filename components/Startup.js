@@ -95,6 +95,7 @@ CertImporterStartupService.prototype = {
 					.getService(nsICertOverrideService);
 		}
 		catch(e) {
+			dump('FAILED TO GET CERT OVERRIDE SERVICE!\n'+e+'\n');
 		}
 
 		this.ensureSilent();
@@ -291,6 +292,7 @@ CertImporterStartupService.prototype = {
 					overrideRules[serialized] = overrideRule;
 					mydump('exceptions: registered='+overrideCount+', defined='+overrideRule.length);
 					if (certOverride && overrideRule.length) {
+						mydump(' => to be added to exception!');
 						toBeAddedToException[serialized] = true;
 						toBeAddedToExceptionCount++;
 					}
@@ -403,6 +405,7 @@ CertImporterStartupService.prototype = {
 					var overrideRule = overrideRules[serialized];
 					if (overrideRule) {
 						overrideRule.forEach(function(aPart) {
+							mydump('apply override rule '+aPart+' for '+aNickname);
 							aPart = aPart.replace(/^\s+|\s+$/g, '');
 							if (/^\/\/|^\#/.test(aPart) ||
 								!/^[^:]+:\d+:\d+$/.test(aPart))
@@ -420,9 +423,11 @@ CertImporterStartupService.prototype = {
 								) &&
 								flags.value != newFlags
 								) {
+								mydump('  clear validity for '+host+':'+port);
 								certOverride.clearValidityOverride(host, port);
 							}
 
+							mydump('  new flags for '+host+':'+port+' = '+newFlags);
 							if (newFlags) {
 								certOverride.rememberValidityOverride(
 									host, port,
