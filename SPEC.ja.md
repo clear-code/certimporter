@@ -117,8 +117,8 @@
 www.example.comに対してのみ有効である」旨の警告が表示される場合、これらの警告を
 表示しないようにするためのセキュリティ例外の定義は以下の通りとなる。
 
-        www.example.com:443:1
-        foo.example.com:443:2
+    www.example.com:443:1
+    foo.example.com:443:2
 
 
 ■■自動的にインポートした証明書の削除
