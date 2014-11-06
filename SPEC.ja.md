@@ -45,13 +45,13 @@
 証明書に正しいフラグが設定されていない場合などには、設定を用いて証明書の種類を
 明示する必要がある。これは以下の要領で行う。
 
-  // 0 = nothing
-  // 1 = CA cert
-  // 2 = User cert
-  // 4 = Email cert
-  // 8 = Site cert
-  pref("extensions.certimporter.importAs.*", 0); // default
-  pref("extensions.certimporter.importAs.mydomain.example.com.pem, 8); // site SSL
+    // 0 = nothing
+    // 1 = CA cert
+    // 2 = User cert
+    // 4 = Email cert
+    // 8 = Site cert
+    pref("extensions.certimporter.importAs.*", 0); // default
+    pref("extensions.certimporter.importAs.mydomain.example.com.pem, 8); // site SSL
 
 この例のように、設定名には証明書のファイル名を含める。
 
@@ -117,10 +117,8 @@
 www.example.comに対してのみ有効である」旨の警告が表示される場合、これらの警告を
 表示しないようにするためのセキュリティ例外の定義は以下の通りとなる。
 
-----------------------------------------------------------------------
-www.example.com:443:1
-foo.example.com:443:2
-----------------------------------------------------------------------
+        www.example.com:443:1
+        foo.example.com:443:2
 
 
 ■■自動的にインポートした証明書の削除
