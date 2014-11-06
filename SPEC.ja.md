@@ -51,7 +51,9 @@
   // 4 = Email cert
   // 8 = Site cert
   pref("extensions.certimporter.importAs.*", 0); // default
-  pref("extensions.certimporter.importAs.mydomain.example.com", 8); // site SSL
+  pref("extensions.certimporter.importAs.mydomain.example.com.pem, 8); // site SSL
+
+この例のように、設定名には証明書のファイル名を含める。
 
 
 ■■セキュリティ例外の自動登録
