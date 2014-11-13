@@ -2,8 +2,6 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-const DEBUG = false;
-
 const ID = 'certimporter@clear-code.com';
 
 const Cc = Components.classes;
@@ -50,17 +48,10 @@ var allowRegisterAgain = false;
 
 function mydump()
 {
-	if (!DEBUG) return;
 	var str = Array.slice(arguments).join('\n');
-	if (str.charAt(str.length-1) != '\n') str += '\n';
-	dump(str);
-	log(str);
-}
-var gLog = [];
-function log(aMessage)
-{
-	gLog.push(aMessage);
-	ObserverService.notifyObservers(null, 'log', aMessage.replace(/[\r\n]+$/, '').replace(/^/gm, '[certimporter] '));
+	Cc['@mozilla.org/consoleservice;1']
+		.getService(Ci.nsIConsoleService)
+		.logStringMessage('[certimporter] ' + str);
 }
  
 function CertImporterStartupService() { 
@@ -442,9 +433,6 @@ CertImporterStartupService.prototype = {
 				}
 			}, this);
 		}, this);
-
-		if (DEBUG)
-			Cc['@mozilla.org/embedcomp/prompt-service;1'].getService(Ci.nsIPromptService).alert(null, 'log', gLog.join(''));
 	},
 
 	serializeCert : function(aCert)
