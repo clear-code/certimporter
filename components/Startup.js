@@ -45,9 +45,14 @@ const nsICertOverrideService = Ci.nsICertOverrideService;
 var importAs = { '*' : 0 };
 var allowRegisterAgain = false;
 
+const DEBUG_KEY = 'extensions.certimporter.debug';
+
+var DEBUG = false;
 
 function mydump()
 {
+	if (!DEBUG)
+		return;
 	var str = Array.slice(arguments).join('\n');
 	Cc['@mozilla.org/consoleservice;1']
 		.getService(Ci.nsIConsoleService)
@@ -79,6 +84,8 @@ CertImporterStartupService.prototype = {
  
 	init : function() 
 	{
+		DEBUG = Prefs.getBoolPref(DEBUG_KEY);
+
 		certdb = Cc['@mozilla.org/security/x509certdb;1']
 				.getService(nsIX509CertDB);
 		try {
