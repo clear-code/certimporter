@@ -6,6 +6,7 @@
                    em:id="certimporter@clear-code.com"
                    em:name="Cert Importer"
                    em:version="1.2.0"
+                   em:type="2"
                    em:description="Imports certs automatically."
                    em:creator="ClearCode Inc."
                    em:homepageURL="http://www.clear-code.com/">
