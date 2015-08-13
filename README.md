@@ -8,6 +8,7 @@ This is mainly desinged for corporate-use.
 ## Supported file types
 
 Supported certs are "PEM" format files, converted from DER X509 files.
+(If you are planning to migrate an existing cert from Internet Explorer to Firefox, you can export it by choosing the format "Base 64 encoded X.509".)
 You must put files with a suffix ".crt", ".cer", or ".pem".
 Sample certs are avialable at ./doc/*.pem in the repository.
 
