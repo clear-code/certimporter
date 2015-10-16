@@ -17,6 +17,8 @@ window.addEventListener('DOMContentLoaded', function() {
 					.QueryInterface(Ci.nsIDialogParamBlock);
 	var cert = params.getISupportAtIndex(1).QueryInterface(Ci.nsIX509Cert);
 
+	// Is the cert is going to be imported by this addon automatically?
+	// Otherwise, do nothing.
 	if (registeringCerts.split('\n').indexOf(cert.sha1Fingerprint) < 0)
 		return;
 
