@@ -12,10 +12,16 @@ window.addEventListener('DOMContentLoaded', function() {
 
 	var registeringCerts = Pref.getCharPref('extensions.certimporter.registeringCerts');
 
-	var params = window.arguments[0]
-					.QueryInterface(Ci.nsIPKIParamBlock)
-					.QueryInterface(Ci.nsIDialogParamBlock);
-	var cert = params.getISupportAtIndex(1).QueryInterface(Ci.nsIX509Cert);
+	var params = window.arguments[0];
+	var cert;
+	try { // Firefox 44 and later
+		params = params.QueryInterface(Ci.nsIDialogParamBlock);
+		cert = params.objects.queryElementAt(0, Ci.nsIX509Cert);
+	}
+	catch(error) { // for Firefox 43 and older
+		params = params.QueryInterface(Ci.nsIPKIParamBlock);
+		cert = params.getISupportAtIndex(1).QueryInterface(Ci.nsIX509Cert);
+	}
 
 	// Is the cert is going to be imported by this addon automatically?
 	// Otherwise, do nothing.
