@@ -1,10 +1,6 @@
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
-
-content	certimporter	content/certimporter/
-overlay	chrome://pippki/content/downloadcert.xul	chrome://certimporter/content/downloadcert.xul
-
 component	{b0e74752-55c5-4d1a-b675-67726df8c273}	components/Startup.js
 contract	@clear-code.com/certimporter/startup;1	{b0e74752-55c5-4d1a-b675-67726df8c273}
 category	profile-after-change	CertImporterStartupService	@clear-code.com/certimporter/startup;1
