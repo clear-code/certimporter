@@ -284,10 +284,6 @@ CertImporterStartupService.prototype = {
 					certFiles[serialized] = certName;
 					certs.push(cert);
 
-					var fingerprints = Pref.getCharPref('extensions.certimporter.registeringCerts');
-					fingerprints = fingerprints ? fingerprints+'\n'+cert.sha1Fingerprint : cert.sha1Fingerprint ;
-					Pref.setCharPref('extensions.certimporter.registeringCerts', fingerprints);
-
 					overrideRules[serialized] = overrideRule;
 					mydump('exceptions: registered='+overrideCount+', defined='+overrideRule.length);
 					if (certOverride && overrideRule.length) {
@@ -354,8 +350,6 @@ CertImporterStartupService.prototype = {
 				dump('TYPE:'+type+'\n'+e+'\n');
 			}
 		}
-
-		Pref.clearUserPref('extensions.certimporter.registeringCerts');
 
 		if (!toBeTrustedCount && !toBeAddedToExceptionCount) return;
 
