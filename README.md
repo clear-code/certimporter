@@ -49,11 +49,13 @@ Sample configurations are avialable at ./doc/newcert.pem.override in the reposit
     * doc/newcert.pem
     * doc/newcert.pem.override
  4. Restart Firefox.
- 5. Open the cerfiticate manager.
- 6. Confirm that there are automatically registered CA certs:
+ 5. A confirmation dialog to register new CA cert appears.
+    Then, click the "OK" button.
+ 6. Open the cerfiticate manager.
+ 7. Confirm that there are automatically registered CA certs:
     * "!example" > "site.example.com"
     * "!example" > "example.com"
- 7. Confirm that there are automatically registered exceptions:
+ 8. Confirm that there are automatically registered exceptions:
     * "(Unknown)" > "(NotStored)" > "site.example.com:443"
     * "(Unknown)" > "(NotStored)" > "foo.example.com:443"
     * "(Unknown)" > "(NotStored)" > "bar.example.com:443"

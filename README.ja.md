@@ -46,11 +46,12 @@ DER X509形式から変換されたPEM形式のファイルにのみ対応して
     * doc/newcert.pem
     * doc/newcert.pem.override
  4. Firefoxを再起動する。
- 5. 証明書マネージャを開く。
- 6. 以下の項目が認証局証明書として登録されていることを確認する。
+ 5. 証明書のインポートの確認が表示されるので、OKボタンを押す。
+ 6. 証明書マネージャを開く。
+ 7. 以下の項目が認証局証明書として登録されていることを確認する。
     * "!example" > "site.example.com"
     * "!example" > "example.com"
- 7. 以下の項目がサーバ証明書の例外として登録されていることを確認する。
+ 8. 以下の項目がサーバ証明書の例外として登録されていることを確認する。
     * "(Unknown)" > "(NotStored)" > "site.example.com:443"
     * "(Unknown)" > "(NotStored)" > "foo.example.com:443"
     * "(Unknown)" > "(NotStored)" > "bar.example.com:443"
