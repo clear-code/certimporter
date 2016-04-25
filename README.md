@@ -2,7 +2,7 @@
 
 Provides ability to import any cert files as new CA certs silently.
 
-After [bug 1265113](https://bugzilla.mozilla.org/show_bug.cgi?id=1265113) is landed and an preference `security.enterprise_roots` is configured to `true`, Firefox uses external cert database of Windows itself.
+After [bug 1265113](https://bugzilla.mozilla.org/show_bug.cgi?id=1265113) is landed and an preference `security.enterprise_roots.enabled` is configured to `true`, Firefox uses external cert database of Windows itself.
 Then you don't have to use this addon to import custom CA certs into Firefox's cert database.
 
 
