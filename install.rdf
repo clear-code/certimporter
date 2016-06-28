@@ -9,7 +9,8 @@
                    em:type="2"
                    em:description="Imports certs automatically."
                    em:creator="ClearCode Inc."
-                   em:homepageURL="http://www.clear-code.com/">
+                   em:homepageURL="http://www.clear-code.com/"
+                   em:multiprocessCompatible="true">
 
 
     <!--em:updateURL></em:updateURL-->
