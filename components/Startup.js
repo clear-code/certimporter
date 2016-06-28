@@ -85,9 +85,11 @@ CertImporterStartupService.prototype = {
 	init : function() 
 	{
 		DEBUG = Pref.getBoolPref(DEBUG_KEY);
+		mydump('initialize');
 
 		certdb = Cc['@mozilla.org/security/x509certdb;1']
 				.getService(nsIX509CertDB);
+		mydump('certdb = ', certdb);
 		try {
 			certOverride = Cc['@mozilla.org/security/certoverride;1']
 					.getService(nsICertOverrideService);
