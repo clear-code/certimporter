@@ -165,10 +165,9 @@ CertImporterStartupService.prototype = {
 		var installed = {};
 		certTypes.forEach(function(aType) {
 			try {
-				var nicknames = {};
-				certdb.findCertNicknames(null, aType, {}, nicknames);
-				certCounts[aType] = nicknames.value.length;
-				nicknames.value.forEach(function(aNickname) {
+				var nicknames = this.getCertNamesByType(certdb, aType);
+				certCounts[aType] = nicknames.length;
+				nicknames.forEach(function(aNickname) {
 					aNickname = aNickname.split('\x01')[1];
 					var cert = certdb.findCertByNickname(null, aNickname);
 					var serialized = this.serializeCert(cert);
@@ -354,12 +353,12 @@ CertImporterStartupService.prototype = {
 		if (!toBeTrustedCount && !toBeAddedToExceptionCount) return;
 
 		certTypes.forEach(function(aType) {
-			var nicknames = {};
-			certdb.findCertNicknames(null, aType, {}, nicknames);
+			var nicknames = this.getCertNamesByType(certdb, aType);
 
-			if (certCounts[aType] == nicknames.value.length && !toBeAddedToExceptionCount) return;
+			if (certCounts[aType] == nicknames.length && !toBeAddedToExceptionCount)
+				return;
 
-			nicknames.value.forEach(function(aNickname) {
+			nicknames.forEach(function(aNickname) {
 				aNickname = aNickname.split('\x01')[1];
 				var cert;
 				var serialized;
@@ -434,6 +433,28 @@ CertImporterStartupService.prototype = {
 				}
 			}, this);
 		}, this);
+	},
+
+	getCertNamesByType : function(aCertDB, aType)
+	{
+		if (typeof aCertDB.findCertNicknames == 'function') { // Firefox 46 or older
+			// findCertNicknames is removed by https://bugzilla.mozilla.org/show_bug.cgi?id=1241650
+			let nicknames = {};
+			aCertDB.findCertNicknames(null, aType, {}, nicknames);
+			return nicknames.value;
+		}
+		else { // Firefox 47 and later
+			let certs = aCertDB.getCerts();
+			certs = certs.getEnumerator();
+			let names = [];
+			while (certs.hasMoreElements())
+			{
+				let cert = certs.getNext().QueryInterface(Ci.nsIX509Cert);
+				if (cert.certType & aType)
+					names.push(cert.nickname);
+			}
+			return names;
+		}
 	},
 
 	serializeCert : function(aCert)
