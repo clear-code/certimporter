@@ -171,7 +171,7 @@ CertImporterStartupService.prototype = {
 				certCounts[aType] = nicknames.length;
 				nicknames.forEach(function(aNickname) {
 					aNickname = aNickname.split('\x01')[1];
-					var cert = certdb.findCertByNickname(null, aNickname);
+					var cert = this.getCertByName(certdb, aNickname);
 					var serialized = this.serializeCert(cert);
 					installed[serialized] = true;
 				}, this);
@@ -332,13 +332,15 @@ CertImporterStartupService.prototype = {
 				if (type) {
 					if (type & nsIX509Cert.CA_CERT) {
 						mydump('IMPORT '+file.path+' as a CA cert');
-						certdb.importCertsFromFile(null, file, nsIX509Cert.CA_CERT);
+						this.importFromFile(certdb, file, nsIX509Cert.CA_CERT);
+						mydump('done.');
 					}
 					else {
 						certTypes.forEach(function(aType) {
 							if (type & aType) {
 								mydump('IMPORT '+file.path+' as '+aType);
-								certdb.importCertsFromFile(null, file, aType);
+								this.importFromFile(certdb, file, aType);
+								mydump('done.');
 							}
 						});
 					}
@@ -348,7 +350,7 @@ CertImporterStartupService.prototype = {
 				}
 			}
 			catch(e) {
-				dump('TYPE:'+type+'\n'+e+'\n');
+				dump('Error, TYPE:'+type+'\n'+e+'\n');
 			}
 		}
 
@@ -365,7 +367,7 @@ CertImporterStartupService.prototype = {
 				var cert;
 				var serialized;
 				try {
-					cert = certdb.findCertByNickname(null, aNickname);
+					cert = this.getCertByName(certdb, aNickname);
 					serialized = this.serializeCert(cert);
 					if (!(serialized in toBeTrusted) &&
 						!(serialized in toBeAddedToException))
@@ -456,6 +458,28 @@ CertImporterStartupService.prototype = {
 					names.push(cert.nickname);
 			}
 			return names;
+		}
+	},
+
+	getCertByName : function(aCertDB, aName)
+	{
+		if (aCertDB.findCertByNickname.length == 2) { // Firefox 46 and older
+			// The first argument was removed by https://bugzilla.mozilla.org/show_bug.cgi?id=1241646
+			return aCertDB.findCertByNickname(null, aName);
+		}
+		else { // Firefox 47 and later
+			return aCertDB.findCertByNickname(aName);
+		}
+	},
+
+	importFromFile : function(aCertDB, aFile, aType)
+	{
+		if (aCertDB.importCertsFromFile.length == 3) { // Firefox 46 and older
+			// The first argument was removed by https://bugzilla.mozilla.org/show_bug.cgi?id=1241646
+			aCertDB.importCertsFromFile(null, aFile, aType);
+		}
+		else { // Firefox 47 and later
+			aCertDB.importCertsFromFile(aFile, aType);
 		}
 	},
 
