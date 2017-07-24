@@ -266,24 +266,41 @@ CertImporterStartupService.prototype = {
 			}
 
 			var certs = [];
-			contents.split(/-+(?:BEGIN|END) CERTIFICATE-+/).forEach(function(aCert) {
-				aCert = aCert.replace(/\s/g, '');
-				if (!aCert) return;
-
+			var decodedCerts = [];
+			if (/\.der$/i.test(file.leafName)) {
 				try {
-					var cert = certdb.constructX509FromBase64(aCert);
+					decodedCerts.push(certdb.constructX509(aCert));
+				}
+				catch(e) {
+					dump(e+'\n');
+				}
+			}
+			else {
+				contents.split(/-+(?:BEGIN|END) CERTIFICATE-+/).forEach(function(aCert) {
+					aCert = aCert.replace(/\s/g, '');
+					if (!aCert) return;
+					try {
+						decodedCerts.push(certdb.constructX509FromBase64(aCert));
+					}
+					catch(e) {
+						dump(e+'\n');
+					}
+				}, this);
+			}
+			decodedCerts.forEach(function(aCert) {
+				try {
 					if (nsIX509Cert2)
-						cert = cert.QueryInterface(nsIX509Cert2);
+						aCert = aCert.QueryInterface(nsIX509Cert2);
 
-					var serialized = this.serializeCert(cert);
-					var overrideCount = certOverride ? certOverride.isCertUsedForOverrides(cert, false, true) : 0 ;
+					var serialized = this.serializeCert(aCert);
+					var overrideCount = certOverride ? certOverride.isCertUsedForOverrides(aCert, false, true) : 0 ;
 					mydump("====================CERT DETECTED=======================\n");
-					mydump('TYPE: '+cert.certType);
-					mydump('FINGERPRINT: '+cert.sha1Fingerprint);
+					mydump('TYPE: '+aCert.certType);
+					mydump('FINGERPRINT: '+aCert.sha1Fingerprint);
 					mydump(serialized.split('\n')[0]);
 
 					certFiles[serialized] = certName;
-					certs.push(cert);
+					certs.push(aCert);
 
 					overrideRules[serialized] = overrideRule;
 					mydump('exceptions: registered='+overrideCount+', defined='+overrideRule.length);
@@ -296,7 +313,7 @@ CertImporterStartupService.prototype = {
 
 					try {
 						if (certTypes.some(function(aType) {
-								return certdb.isCertTrusted(cert, aType, certTrusts[aType]);
+								return certdb.isCertTrusted(aCert, aType, certTrusts[aType]);
 							}, this)) {
 							mydump('already installed\n');
 							return;
@@ -311,7 +328,7 @@ CertImporterStartupService.prototype = {
 
 					count++;
 
-					importAs[certName] = importAs[certName] || cert.certType || 0;
+					importAs[certName] = importAs[certName] || aCert.certType || 0;
 				}
 				catch(e) {
 					dump(e+'\n');
