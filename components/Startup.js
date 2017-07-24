@@ -95,7 +95,7 @@ CertImporterStartupService.prototype = {
 					.getService(nsICertOverrideService);
 		}
 		catch(e) {
-			dump('FAILED TO GET CERT OVERRIDE SERVICE!\n'+e+'\n');
+			mydump('FAILED TO GET CERT OVERRIDE SERVICE!\n'+e+'\n');
 		}
 
 		this.ensureSilent();
@@ -272,7 +272,7 @@ CertImporterStartupService.prototype = {
 					decodedCerts.push(certdb.constructX509(aCert));
 				}
 				catch(e) {
-					dump(e+'\n');
+					mydump(e+'\n');
 				}
 			}
 			else {
@@ -283,7 +283,7 @@ CertImporterStartupService.prototype = {
 						decodedCerts.push(certdb.constructX509FromBase64(aCert));
 					}
 					catch(e) {
-						dump(e+'\n');
+						mydump(e+'\n');
 					}
 				}, this);
 			}
@@ -320,7 +320,7 @@ CertImporterStartupService.prototype = {
 						}
 					}
 					catch(e) {
-						dump(e+'\n');
+						mydump(e+'\n');
 					}
 					mydump('to be installed\n');
 					toBeTrusted[serialized] = true;
@@ -331,7 +331,7 @@ CertImporterStartupService.prototype = {
 					importAs[certName] = importAs[certName] || aCert.certType || 0;
 				}
 				catch(e) {
-					dump(e+'\n');
+					mydump(e+'\n');
 				}
 			}, this);
 
@@ -367,7 +367,7 @@ CertImporterStartupService.prototype = {
 				}
 			}
 			catch(e) {
-				dump('Error, TYPE:'+type+'\n'+e+'\n');
+				mydump('Error, TYPE:'+type+'\n'+e+'\n');
 			}
 		}
 
@@ -409,7 +409,7 @@ CertImporterStartupService.prototype = {
 							}
 						}
 						catch(e) {
-							dump('TYPE:'+aType+'\n'+e+'\n');
+							mydump('TYPE:'+aType+'\n'+e+'\n');
 						}
 					}, this)
 				}
@@ -538,7 +538,7 @@ CertImporterStartupService.prototype = {
 			stream.close();
 		}
 		catch(e) {
-			dump(e+'\n');
+			mydump(e+'\n');
 			return fileContents;
 		}
 
