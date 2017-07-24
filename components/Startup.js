@@ -269,7 +269,7 @@ CertImporterStartupService.prototype = {
 			var decodedCerts = [];
 			if (/\.der$/i.test(file.leafName)) {
 				try {
-					decodedCerts.push(certdb.constructX509(contents));
+					decodedCerts.push(certdb.constructX509(contents, contents.length));
 				}
 				catch(e) {
 					mydump(e+'\n');
