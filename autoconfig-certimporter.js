@@ -3,6 +3,7 @@
   const { Services } = Cu.import('resource://gre/modules/Services.jsm', {});
 
   const ID = 'certimporter@clear-code.com';
+  const BASE = 'extensions.certimporter.';
 
   const ObserverService = Cc['@mozilla.org/observer-service;1']
     .getService(Ci.nsIObserverService);
@@ -38,10 +39,10 @@
   const importAs = { '*' : 0 };
   let allowRegisterAgain = false;
 
-  const DEBUG_KEY = 'extensions.certimporter.debug';
+  const DEBUG_KEY = BASE + 'debug';
   let DEBUG = false;
 
-  const mydump = () => {
+  const log = () => {
     if (!DEBUG)
       return;
     const str = Array.slice(arguments).join('\n');
@@ -57,29 +58,41 @@
           ObserverService.removeObserver(this, 'final-ui-startup');
           this.init();
           return;
+        case 'domwindowopened':
+          if (!aSubject.QueryInterface(Ci.nsIInterfaceRequestor)
+                       .getInterface(Ci.nsIWebNavigation)
+                       .QueryInterface(Ci.nsIDocShell)
+                       .QueryInterface(Ci.nsIDocShellTreeNode || Ci.nsIDocShellTreeItem) // nsIDocShellTreeNode is merged to nsIDocShellTreeItem by https://bugzilla.mozilla.org/show_bug.cgi?id=331376
+                       .QueryInterface(Ci.nsIDocShellTreeItem)
+                       .parent)
+            aSubject.QueryInterface(Ci.nsIDOMWindow)
+                    .addEventListener('DOMContentLoaded', () => {
+                      handleAutoConfirmWindow(aSubject.QueryInterface(Ci.nsIDOMWindow));
+                    }, { once: true });
+          return;
       }
     },
  
     init() {
       DEBUG = Pref.getBoolPref(DEBUG_KEY);
-      mydump('initialize');
+      log('initialize');
 
       certdb = Cc['@mozilla.org/security/x509certdb;1']
           .getService(nsIX509CertDB);
-      mydump('certdb = ', certdb);
+      log('certdb = ', certdb);
       try {
         certOverride = Cc['@mozilla.org/security/certoverride;1']
             .getService(nsICertOverrideService);
       }
       catch(e) {
-        mydump('FAILED TO GET CERT OVERRIDE SERVICE!\n'+e+'\n');
+        log('FAILED TO GET CERT OVERRIDE SERVICE!\n'+e+'\n');
       }
 
       ensureSilent();
       loadPrefs();
       registerCerts();
     },
-    
+
     QueryInterface(aIID) {
       if (!aIID.equals(Ci.nsIObserver) &&
           !aIID.equals(Ci.nsISupports)) {
@@ -90,7 +103,7 @@
   };
 
   const ensureSilent = () => {
-    if (!Pref.getBoolPref('extensions.certimporter.silent')) return;
+    if (!Pref.getBoolPref(BASE + 'silent')) return;
     const NEWADDONS = 'extensions.newAddons';
     try {
       let list = Pref.getCharPref(NEWADDONS).split(',');
@@ -108,7 +121,7 @@
   };
 
   const loadPrefs = () => {
-    const prefix = 'extensions.certimporter.importAs.';
+    const prefix = BASE + 'importAs.';
     Pref.getChildList(prefix, {}).forEach(function(aPref) {
       try {
         importAs[aPref.replace(prefix, '')] = Pref.getIntPref(aPref);
@@ -118,7 +131,7 @@
     }, this);
 
     try {
-      allowRegisterAgain = Pref.getBoolPref('extensions.certimporter.allowRegisterAgain');
+      allowRegisterAgain = Pref.getBoolPref(BASE + 'allowRegisterAgain');
     }
     catch(e) {
     }
@@ -127,20 +140,48 @@
   const registerCerts = () => {
     let defaults = DirectoryService.get('CurProcD', Ci.nsIFile);
     defaults.append('defaults');
-    mydump('global1 '+defaults.path+' : '+defaults.exists());
+    log('global1 '+defaults.path+' : '+defaults.exists());
     if (defaults.exists())
       registerCertsInDirectory(defaults);
 
     defaults = DirectoryService.get('GreD', Ci.nsIFile);
     defaults.append('defaults');
-    mydump('global2 '+defaults.path+' : '+defaults.exists());
+    log('global2 '+defaults.path+' : '+defaults.exists());
     if (defaults.exists())
       registerCertsInDirectory(defaults);
 
     let profile = DirectoryService.get('ProfD', Ci.nsIFile);
-    mydump('private '+profile.path+' : '+profile.exists());
+    log('private '+profile.path+' : '+profile.exists());
     if (profile.exists())
       registerCertsInDirectory(profile);
+  };
+
+  const autoConfirmUrls = [];
+  const autoConfirmConfigs = [];
+  const setAutoConfirmConfigs = (aCertName, aTrust) => {
+    if (!aTrust)
+      aTrust = certTrusts[nsIX509Cert.CA_CERT];
+    let base = BASE + 'auto-import.' + aCertName.replace(/\./g, '_');
+    let actions = ['accept'];
+    if (aTrust & nsIX509CertDB.TRUSTED_OBJSIGN)
+      actions.unshift('check;id:trustObjSign');
+    if (aTrust & nsIX509CertDB.TRUSTED_EMAIL)
+      actions.unshift('check;id:trustEmail');
+    if (aTrust & nsIX509CertDB.TRUSTED_SSL)
+      actions.unshift('check;id:trustSSL');
+
+    // 日本語環境用の設定
+    autoConfirmUrls.push('chrome://pippki/content/downloadcert.xul');
+    autoConfirmConfigs.push({
+      text:    '“' + aCertName + '” が行う認証のうち、信頼するものを選択してください。',
+      actions: JSON.stringify(actions)
+    });
+    // 英語環境用の設定
+    autoConfirmUrls.push('chrome://pippki/content/downloadcert.xul');
+    autoConfirmConfigs.push({
+      text:    'Do you want to trust “' + aCertName + '” for the following purposes?',
+      actions: JSON.stringify(actions)
+    });
   };
  
   const registerCertsInDirectory = (aDirectory) => {
@@ -178,7 +219,7 @@
           !/\.(cer|crt|pem|der)$/i.test(file.leafName))
         continue;
 
-      mydump('CHECK '+file.path);
+      log('CHECK '+file.path);
 
       let certName = file.leafName.replace(/^\s+|\s+$/g, '');
       let certDate = '';
@@ -186,31 +227,31 @@
       try {
         certDate = String(file.lastModifiedTime);
         try {
-          lastCertDate = Pref.getCharPref('extensions.certimporter.certs.'+certName+'.lastDate');
+          lastCertDate = Pref.getCharPref(BASE + 'certs.'+certName+'.lastDate');
         }
         catch(e) {
         }
       }
       catch(e) {
-        mydump(e);
+        log(e);
       }
 
       let overrideFile = file.parent;
       overrideFile.append(certName+'.override');
-      mydump('CHECK '+overrideFile.path+'\n exists: '+overrideFile.exists());
+      log('CHECK '+overrideFile.path+'\n exists: '+overrideFile.exists());
       let overrideDate = '';
       let lastOverrideDate = '';
       try {
         if (certOverride && overrideFile.exists())
           overrideDate = String(overrideFile.lastModifiedTime);
         try {
-          lastOverrideDate = Pref.getCharPref('extensions.certimporter.certs.'+certName+'.lastOverrideDate');
+          lastOverrideDate = Pref.getCharPref(BASE + 'certs.'+certName+'.lastOverrideDate');
         }
         catch(e) {
         }
       }
       catch(e) {
-        mydump(e);
+        log(e);
       }
 
       if ((!allowRegisterAgain && lastCertDate == certDate) &&
@@ -219,7 +260,7 @@
 
       let contents = readFrom(file);
       if (!contents) continue;
-      Pref.setCharPref('extensions.certimporter.certs.'+certName+'.lastDate', certDate);
+      Pref.setCharPref(BASE + 'certs.'+certName+'.lastDate', certDate);
 
       let count = 0;
 
@@ -228,11 +269,11 @@
         if (certOverride) {
           if (overrideFile.exists()) {
             overrideRule = readFrom(overrideFile).replace(/^\s+|\s+$/g, '');
-            Pref.setCharPref('extensions.certimporter.certs.'+certName+'.lastOverrideDate', overrideDate);
+            Pref.setCharPref(BASE + 'certs.'+certName+'.lastOverrideDate', overrideDate);
           }
           else {
             try {
-              overrideRule = Pref.getCharPref('extensions.certimporter.override.'+certName);
+              overrideRule = Pref.getCharPref(BASE + 'override.'+certName);
             } catch(e) {
               overrideRule = null;
             }
@@ -241,7 +282,7 @@
         }
       }
       catch(e) {
-        mydump(e);
+        log(e);
       }
 
       let certs = [];
@@ -251,7 +292,7 @@
           decodedCerts.push(certdb.constructX509(contents, contents.length));
         }
         catch(e) {
-          mydump(e+'\n');
+          log(e+'\n');
         }
       }
       else {
@@ -262,7 +303,7 @@
             decodedCerts.push(certdb.constructX509FromBase64(aCert));
           }
           catch(e) {
-            mydump(e+'\n');
+            log(e+'\n');
           }
         });
       }
@@ -273,35 +314,35 @@
 
           let serialized = serializeCert(aCert);
           let overrideCount = certOverride ? certOverride.isCertUsedForOverrides(aCert, false, true) : 0 ;
-          mydump("====================CERT DETECTED=======================\n");
-          mydump('TYPE: '+aCert.certType);
-          mydump('FINGERPRINT: '+aCert.sha1Fingerprint);
-          mydump(serialized.split('\n')[0]);
+          log('====================CERT DETECTED=======================\n');
+          log('TYPE: '+aCert.certType);
+          log('FINGERPRINT: '+aCert.sha1Fingerprint);
+          log(serialized.split('\n')[0]);
 
           certFiles[serialized] = certName;
           certs.push(aCert);
 
           overrideRules[serialized] = overrideRule;
-          mydump('exceptions: registered='+overrideCount+', defined='+overrideRule.length);
+          log('exceptions: registered='+overrideCount+', defined='+overrideRule.length);
           if (certOverride && overrideRule.length) {
-            mydump(' => to be added to exception!');
+            log(' => to be added to exception!');
             toBeAddedToException[serialized] = true;
             toBeAddedToExceptionCount++;
           }
-          mydump("========================================================\n");
+          log('========================================================\n');
 
           try {
             if (certTypes.some(aType => {
                   return certdb.isCertTrusted(aCert, aType, certTrusts[aType]);
                 })) {
-              mydump('already installed\n');
+              log('already installed\n');
               return;
             }
           }
           catch(e) {
-            mydump(e+'\n');
+            log(e+'\n');
           }
-          mydump('to be installed\n');
+          log('to be installed\n');
           toBeTrusted[serialized] = true;
           toBeTrustedCount++;
 
@@ -310,43 +351,44 @@
           importAs[certName] = importAs[certName] || aCert.certType || 0;
         }
         catch(e) {
-          mydump(e+'\n');
+          log(e+'\n');
         }
       });
 
       if (!count) {
-        mydump('SKIP '+file.path+' (no count)');
+        log('SKIP '+file.path+' (no count)');
         continue;
       }
 
-      mydump('certName '+certName);
+      log('certName '+certName);
       let type = certName in importAs ?
           importAs[certName] :
           importAs['*'] ;
-      mydump('type '+type);
+      log('type '+type);
       try {
         if (type) {
           if (type & nsIX509Cert.CA_CERT) {
-            mydump('IMPORT '+file.path+' as a CA cert');
+            log('IMPORT '+file.path+' as a CA cert');
+            setAutoConfirmConfigs(certName, certTrusts[nsIX509Cert.CA_CERT]);
             importFromFile(certdb, file, nsIX509Cert.CA_CERT);
-            mydump('done.');
+            log('done.');
           }
           else {
             certTypes.forEach(function(aType) {
               if (type & aType) {
-                mydump('IMPORT '+file.path+' as '+aType);
+                setAutoConfirmConfigs(certName, certTrusts[aType]);
                 importFromFile(certdb, file, aType);
-                mydump('done.');
+                log('done.');
               }
             });
           }
         }
         else {
-          mydump('SKIP '+file.path);
+          log('SKIP '+file.path);
         }
       }
       catch(e) {
-        mydump('Error, TYPE:'+type+'\n'+e+'\n');
+        log('Error, TYPE:'+type+'\n'+e+'\n');
       }
     }
 
@@ -373,22 +415,22 @@
           return;
         }
 
-        mydump('========= '+aNickname+' ===========');
+        log('========= '+aNickname+' ===========');
         if (nsIX509Cert2)
           cert = cert.QueryInterface(nsIX509Cert2);
 
-        mydump('TYPE: '+cert.certType);
+        log('TYPE: '+cert.certType);
 
         if (serialized in toBeTrusted) {
           certTypes.forEach(aType => {
             try {
               if (!('certType' in cert) || cert.certType & aType) {
-                mydump('register as type '+aType+': '+aNickname);
+                log('register as type '+aType+': '+aNickname);
                 certdb.setCertTrust(cert, aType, certTrusts[aType]);
               }
             }
             catch(e) {
-              mydump('TYPE:'+aType+'\n'+e+'\n');
+              log('TYPE:'+aType+'\n'+e+'\n');
             }
           })
         }
@@ -397,7 +439,7 @@
           let overrideRule = overrideRules[serialized];
           if (overrideRule) {
             overrideRule.forEach(aPart => {
-              mydump('apply override rule '+aPart+' for '+aNickname);
+              log('apply override rule '+aPart+' for '+aNickname);
               aPart = aPart.replace(/^\s+|\s+$/g, '');
               if (/^\/\/|^\#/.test(aPart) ||
                   !/^[^:]+:\d+:\d+$/.test(aPart))
@@ -413,11 +455,11 @@
                     hash, fingerprint, flags, temporary
                   ) &&
                   flags.value != newFlags) {
-                mydump('  clear validity for '+host+':'+port);
+                log('  clear validity for '+host+':'+port);
                 certOverride.clearValidityOverride(host, port);
               }
 
-              mydump('  new flags for '+host+':'+port+' = '+newFlags);
+              log('  new flags for '+host+':'+port+' = '+newFlags);
               if (newFlags) {
                 certOverride.rememberValidityOverride(
                   host, port,
@@ -509,7 +551,7 @@
       stream.close();
     }
     catch(e) {
-      mydump(e+'\n');
+      log(e+'\n');
       return fileContents;
     }
 
@@ -517,4 +559,199 @@
   };
 
   ObserverService.addObserver(observer, 'final-ui-startup', false);
+
+
+  // codes for "Auto Confirm"
+  const handleAutoConfirmWindow = (aWindow) => {
+    const doc = aWindow.document;
+    const url = aWindow.location.href;
+    log('url: ' + url);
+    let fromIndex = 0;
+    while (true) {
+      log('fromIndex: ' + fromIndex);
+      let index = autoConfirmUrls.indexOf(url, fromIndex);
+      log('index: ' + index);
+      if (index === -1)
+        return;
+      let config = autoConfirmConfigs[index];
+      log('config: ' + config);
+      if (matchedWindow(aWindow, config)) {
+        aWindow.setTimeout(function() {
+          let action = config.action;
+          if (action)
+            processAction(aWindow, action);
+          let actions = config.actions;
+          if (actions)
+            processActions(aWindow, actions);
+        }, 500);
+        return;
+      }
+      fromIndex = index + 1;
+    }
+  };
+
+  const processActions = (aWindow, aActions, aRootElement) => {
+    const doc = aWindow.document;
+    log('actions: ' + aActions);
+    for (let action of JSON.parse(aActions)) {
+      log('action: ' + action);
+      processAction(aWindow, action, aRootElement);
+    }
+  };
+
+  const describeElement = (aElement) => {
+    const description = [aElement.localName];
+    if (aElement.id)
+      description.push('#' + aElement.id);
+    if (aElement.className)
+      description.push('.' + aElement.className.replace(/\s+/g, '.'));
+    return description.join('');
+  };
+
+  const processAction = (aWindow, aAction, aRootElement) => {
+    const doc = aWindow.document;
+    const root = doc.documentElement;
+    log('action: ' + aAction);
+    const actions = aAction.match(/^([^;]+);?(.*)/);
+    if (actions === null)
+      return;
+    const action = actions[1];
+    const value = actions[2];
+    switch (action) {
+      case 'accept':
+        log('accept');
+        if (typeof root.acceptDialog == 'function')
+          root.acceptDialog();
+        else
+          Cu.reportError(new Error('We don\'t know how to accept '+describeElement(root)));
+        return;
+      case 'cancel':
+        log('cancel');
+        if (typeof root.cancelDialog == 'function')
+          root.cancelDialog();
+        else
+          Cu.reportError(new Error('We don\'t know how to cancel '+describeElement(root)));
+        return;
+      case 'click':
+        log('click');
+        {
+          let element = findVisibleElementByLabel(root, value);
+          log(element);
+          if (typeof element.click === 'function') {
+            log('element.click(): ready');
+            element.click();
+            log('element.click(): done');
+          }
+          else {
+            log('element is not clickable');
+            Cu.reportError(new Error('found element '+describeElement(element)+' is not clickable.'));
+          }
+        }
+        return;
+      case 'push':
+        let buttons;
+        if (root._buttons) {
+          buttons = root._buttons;
+        }
+        else {
+          Cu.reportError(new Error('We cannot detect pushable buttons in '+describeElement(root)));
+          return;
+        }
+        for (let type in buttons) {
+          const button = buttons[type];
+          log('label: ' + button.label);
+          if (button.label.match(value)) {
+            button.click();
+            log('push');
+            return;
+          }
+        }
+        log('push: no match');
+        return;
+      case 'input':
+        Cu.reportError(new Error('We don't know how to input text at '+describeElement(root)));
+        log('input');
+        return;
+      case 'check':
+        log('check');
+        if (value) {
+          const element = findVisibleElementByLabel(root, value);
+          log('  element: ' + element);
+          log('  element.checked: ready');
+          element.checked = true;
+          log('  element.checked: done');
+        }
+        else {
+          Cu.reportError(new Error('We don\'t know how to check checkbox in '+describeElement(root)));
+        }
+        return;
+      case 'uncheck':
+        log('uncheck');
+        if (value) {
+          const element = findVisibleElementByLabel(root, value);
+          log(element);
+          log('  element.checked: ready');
+          element.checked = false;
+          log('  element.checked: done');
+        }
+        else {
+          Cu.reportError(new Error('We don\'t know how to uncheck checkbox in '+describeElement(root)));
+        }
+        return;
+      default:
+        log('no action');
+        return;
+    }
+  };
+
+  const matchedWindow = (aWindow, aConfig) => {
+    log('matchedWindow');
+    let textMatcher = aConfig.text;
+    log('  textMatcher: ' + textMatcher);
+    if (textMatcher && !findVisibleElementByLabel(aWindow.document.documentElement, textMatcher))
+      return false;
+    log('  match');
+    return  true;
+  };
+
+  const findVisibleElementByLabel(aRootElement, text) => {
+    log('findVisibleElementByLabel');
+    if (text.indexOf('"') !== -1) {
+      text = 'concat("' + text.replace(/"/g, '", \'"\', "') + '")';
+    } else {
+      text = '"' + text + '"';
+    }
+    let expression = '/descendant::*[contains(@label, ' + text + ')] | ' +
+                     '/descendant::*[local-name()="label" or local-name()="description"][contains(@value, ' + text + ')] | ' +
+                     '/descendant::*[contains(text(), ' + text + ')]';
+    log('  expression: ' + expression);
+    try {
+      const doc = aRootElement.ownerDocument;
+      const global = doc.defaultView;
+      const elements = doc.evaluate(
+        expression,
+        aRootElement,
+        null,
+        global.XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
+        null
+      );
+    }
+    catch(e) {
+      log('  error: ' + e);
+    }
+    log('  elements.length: ' + elements.snapshotLength);
+    for (let i = 0, maxi = elements.snapshotLength; i < maxi; i++) {
+      const element = elements.snapshotItem(i);
+      if (element.clientHeight > 0 &&
+          element.clientWidth > 0) {
+        return element;
+      }
+    }
+    log('  no visible element');
+    return null;
+  };
+
+  Cc['@mozilla.org/embedcomp/window-watcher;1']
+    .getService(Ci.nsIWindowWatcher)
+    .registerNotification(observer);
 }; 
