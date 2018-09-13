@@ -215,8 +215,6 @@
     let toBeTrustedCount = 0;
     let certFiles = {};
 
-    let toBeAddedToException = {};
-    let toBeAddedToExceptionCount = 0;
     let overrideRules = {};
 
     let files = aDirectory.directoryEntries;
@@ -331,11 +329,8 @@
 
           overrideRules[serialized] = overrideRule;
           log(`exceptions: registered=${overrideCount}, defined=${overrideRule.length}`);
-          if (certOverride && overrideRule.length) {
+          if (certOverride && overrideRule.length)
             log(' => to be added to exception!');
-            toBeAddedToException[serialized] = true;
-            toBeAddedToExceptionCount++;
-          }
           log('========================================================\n');
 
           try {
@@ -387,12 +382,45 @@
             log('done.');
           }
           else if (type & nsIX509Cert.SERVER_CERT) {
-            certTypes.forEach(aType => {
-              if (type & aType) {
-                setAutoConfirmConfigs(certName, certTrusts[aType]);
-                importFromFile(certdb, file, aType);
-                log('done.');
+            certs.forEach(aCert => {
+              const serialized = serializeCert(aCert);
+              const overrideRule = overrideRules[serialized];
+              const nickname = aCert.nickname || aCert.commonName;
+              if (!overrideRule) {
+                log(`ERROR: Missing override rule for ${nickname} ${serialized}`);
+                return;
               }
+              overrideRule.forEach(aPart => {
+              log(`apply override rule ${aPart} for ${nickname}`);
+                aPart = aPart.replace(/^\s+|\s+$/g, '');
+                if (/^\/\/|^\#/.test(aPart) ||
+                    !/^[^:]+:\d+:\d+$/.test(aPart))
+                  return;
+                let host, port, newFlags;
+                [host, port, newFlags] = aPart.split(':');
+                port     = parseInt(port);
+                newFlags = parseInt(newFlags);
+
+                let hash = {}, fingerprint = {}, flags = {}, temporary = {};
+                if (certOverride.getValidityOverride(
+                      host, port,
+                      hash, fingerprint, flags, temporary
+                    ) &&
+                    flags.value != newFlags) {
+                  log(`  clear validity for ${host}:${port}`);
+                  certOverride.clearValidityOverride(host, port);
+                }
+
+                log(`  new flags for ${host}:${port} = ${newFlags}`);
+                if (newFlags) {
+                  certOverride.rememberValidityOverride(
+                    host, port,
+                    aCert,
+                    newFlags,
+                    false
+                  );
+                }
+              });
             });
           }
           else {
@@ -407,88 +435,6 @@
         log(`Error, TYPE:${type}\n${e}\n`);
       }
     }
-
-    if (!toBeTrustedCount && !toBeAddedToExceptionCount) return;
-
-    certTypes.forEach(aType => {
-      let nicknames = getCertNamesByType(certdb, aType);
-
-      if (certCounts[aType] == nicknames.length && !toBeAddedToExceptionCount)
-        return;
-
-      nicknames.forEach(aNickname => {
-        aNickname = aNickname.split('\x01')[1];
-        let cert;
-        let serialized;
-        try {
-          cert = getCertByName(certdb, aNickname);
-          serialized = serializeCert(cert);
-          if (!(serialized in toBeTrusted) &&
-            !(serialized in toBeAddedToException))
-            return;
-        }
-        catch(e) {
-          return;
-        }
-
-        log(`========= ${aNickname} ===========`);
-        if (nsIX509Cert2)
-          cert = cert.QueryInterface(nsIX509Cert2);
-
-        log(`TYPE: ${cert.certType}`);
-
-        if (serialized in toBeTrusted) {
-          certTypes.forEach(aType => {
-            try {
-              if (!('certType' in cert) || cert.certType & aType) {
-                log(`register as type ${aType}: ${aNickname}`);
-                certdb.setCertTrust(cert, aType, certTrusts[aType]);
-              }
-            }
-            catch(e) {
-              log(`TYPE:${aType}\n${e}\n`);
-            }
-          })
-        }
-
-        if (serialized in toBeAddedToException) {
-          let overrideRule = overrideRules[serialized];
-          if (overrideRule) {
-            overrideRule.forEach(aPart => {
-              log(`apply override rule ${aPart} for ${aNickname}`);
-              aPart = aPart.replace(/^\s+|\s+$/g, '');
-              if (/^\/\/|^\#/.test(aPart) ||
-                  !/^[^:]+:\d+:\d+$/.test(aPart))
-                return;
-              let host, port, newFlags;
-              [host, port, newFlags] = aPart.split(':');
-              port     = parseInt(port);
-              newFlags = parseInt(newFlags);
-
-              let hash = {}, fingerprint = {}, flags = {}, temporary = {};
-              if (certOverride.getValidityOverride(
-                    host, port,
-                    hash, fingerprint, flags, temporary
-                  ) &&
-                  flags.value != newFlags) {
-                log(`  clear validity for ${host}:${port}`);
-                certOverride.clearValidityOverride(host, port);
-              }
-
-              log(`  new flags for ${host}:${port} = ${newFlags}`);
-              if (newFlags) {
-                certOverride.rememberValidityOverride(
-                  host, port,
-                  cert,
-                  newFlags,
-                  false
-                );
-              }
-            });
-          }
-        }
-      });
-    });
   };
 
   const getCertNamesByType = (aCertDB, aType) => {
@@ -564,7 +510,7 @@
     log(`url: ${url}`);
     let fromIndex = 0;
     while (true) {
-      log(`fromIndex: ${fromIndex)}`;
+      log(`fromIndex: ${fromIndex}`);
       let index = autoConfirmUrls.indexOf(url, fromIndex);
       log(`index: ${index}`);
       if (index === -1)
