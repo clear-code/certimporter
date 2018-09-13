@@ -483,43 +483,23 @@
   };
 
   const getCertNamesByType = (aCertDB, aType) => {
-    if (typeof aCertDB.findCertNicknames == 'function') { // Firefox 46 or older
-      // findCertNicknames is removed by https://bugzilla.mozilla.org/show_bug.cgi?id=1241650
-      let nicknames = {};
-      aCertDB.findCertNicknames(null, aType, {}, nicknames);
-      return nicknames.value;
+    let certs = aCertDB.getCerts();
+    certs = certs.getEnumerator();
+    let names = [];
+    while (certs.hasMoreElements()) {
+      let cert = certs.getNext().QueryInterface(Ci.nsIX509Cert);
+      if (cert.certType & aType)
+        names.push(cert.nickname || cert.commonName);
     }
-    else { // Firefox 47 and later
-      let certs = aCertDB.getCerts();
-      certs = certs.getEnumerator();
-      let names = [];
-      while (certs.hasMoreElements()) {
-        let cert = certs.getNext().QueryInterface(Ci.nsIX509Cert);
-        if (cert.certType & aType)
-          names.push(cert.nickname);
-      }
-      return names;
-    }
+    return names;
   };
 
   const getCertByName = (aCertDB, aName) => {
-    if (aCertDB.findCertByNickname.length == 2) { // Firefox 46 and older
-      // The first argument was removed by https://bugzilla.mozilla.org/show_bug.cgi?id=1241646
-      return aCertDB.findCertByNickname(null, aName);
-    }
-    else { // Firefox 47 and later
-      return aCertDB.findCertByNickname(aName);
-    }
+    return aCertDB.findCertByNickname(aName);
   };
 
   const importFromFile = (aCertDB, aFile, aType) => {
-    if (aCertDB.importCertsFromFile.length == 3) { // Firefox 46 and older
-      // The first argument was removed by https://bugzilla.mozilla.org/show_bug.cgi?id=1241646
-      aCertDB.importCertsFromFile(null, aFile, aType);
-    }
-    else { // Firefox 47 and later
-      aCertDB.importCertsFromFile(aFile, aType);
-    }
+    aCertDB.importCertsFromFile(aFile, aType);
   };
 
   const serializeCert = (aCert) => {
