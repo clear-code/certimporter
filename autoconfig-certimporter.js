@@ -129,13 +129,13 @@
 
   const loadPrefs = () => {
     const prefix = BASE + 'importAs.';
-    Services.prefs.getChildList(prefix, {}).forEach(function(aPref) {
+    Services.prefs.getChildList(prefix, {}).forEach(aPref => {
       try {
         importAs[aPref.replace(prefix, '')] = Services.prefs.getIntPref(aPref);
       }
       catch(e) {
       }
-    }, this);
+    });
 
     try {
       allowRegisterAgain = Services.prefs.getBoolPref(BASE + 'allowRegisterAgain');
@@ -381,7 +381,7 @@
             log('done.');
           }
           else {
-            certTypes.forEach(function(aType) {
+            certTypes.forEach(aType => {
               if (type & aType) {
                 setAutoConfirmConfigs(certName, certTrusts[aType]);
                 importFromFile(certdb, file, aType);
@@ -563,7 +563,7 @@
       let config = autoConfirmConfigs[index];
       log('config: ' + config);
       if (matchedWindow(aWindow, config)) {
-        aWindow.setTimeout(function() {
+        aWindow.setTimeout(() => {
           let action = config.action;
           if (action)
             processAction(aWindow, action);
