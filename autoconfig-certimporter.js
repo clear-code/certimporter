@@ -39,10 +39,10 @@
   const DEBUG_KEY = BASE + 'debug';
   let DEBUG = false;
 
-  const log = () => {
+  const log = (...args) => {
     if (!DEBUG)
       return;
-    const str = Array.slice(arguments).join('\n');
+    const str = Array.slice(args).join('\n');
     Cc['@mozilla.org/consoleservice;1']
       .getService(Ci.nsIConsoleService)
       .logStringMessage('[certimporter] ' + str);
