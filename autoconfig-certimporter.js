@@ -669,7 +669,7 @@
         log('push: no match');
         return;
       case 'input':
-        Cu.reportError(new Error('We don't know how to input text at '+describeElement(root)));
+        Cu.reportError(new Error('We don\'t know how to input text at '+describeElement(root)));
         log('input');
         return;
       case 'check':
@@ -714,7 +714,7 @@
     return  true;
   };
 
-  const findVisibleElementByLabel(aRootElement, text) => {
+  const findVisibleElementByLabel = (aRootElement, text) => {
     log('findVisibleElementByLabel');
     if (text.indexOf('"') !== -1) {
       text = 'concat("' + text.replace(/"/g, '", \'"\', "') + '")';
