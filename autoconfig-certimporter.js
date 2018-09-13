@@ -45,7 +45,7 @@
     const str = Array.slice(args).join('\n');
     Cc['@mozilla.org/consoleservice;1']
       .getService(Ci.nsIConsoleService)
-      .logStringMessage('[certimporter] ' + str);
+      .logStringMessage(`[certimporter] ${str}`);
   };
 
   const observer = {
@@ -86,7 +86,7 @@
             .getService(nsICertOverrideService);
       }
       catch(e) {
-        log('FAILED TO GET CERT OVERRIDE SERVICE!\n'+e+'\n');
+        log(`FAILED TO GET CERT OVERRIDE SERVICE!\n${e}\n`);
       }
 
       ensureSilent();
@@ -105,7 +105,7 @@
 
   const ensureSilent = () => {
     try {
-      if (!Services.prefs.getBoolPref(BASE + 'silent'))
+      if (!Services.prefs.getBoolPref(`${BASE}silent`))
         return;
     }
     catch(e) {
@@ -128,7 +128,7 @@
   };
 
   const loadPrefs = () => {
-    const prefix = BASE + 'importAs.';
+    const prefix = `${BASE}importAs.`;
     Services.prefs.getChildList(prefix, {}).forEach(aPref => {
       try {
         importAs[aPref.replace(prefix, '')] = Services.prefs.getIntPref(aPref);
@@ -138,7 +138,7 @@
     });
 
     try {
-      allowRegisterAgain = Services.prefs.getBoolPref(BASE + 'allowRegisterAgain');
+      allowRegisterAgain = Services.prefs.getBoolPref(`${BASE}allowRegisterAgain`);
     }
     catch(e) {
     }
@@ -147,18 +147,18 @@
   const registerCerts = () => {
     let defaults = DirectoryService.get('CurProcD', Ci.nsIFile);
     defaults.append('defaults');
-    log('global1 '+defaults.path+' : '+defaults.exists());
+    log(`global1 ${defaults.path} : ${defaults.exists()}`);
     if (defaults.exists())
       registerCertsInDirectory(defaults);
 
     defaults = DirectoryService.get('GreD', Ci.nsIFile);
     defaults.append('defaults');
-    log('global2 '+defaults.path+' : '+defaults.exists());
+    log(`global2 ${defaults.path} : ${defaults.exists()}`);
     if (defaults.exists())
       registerCertsInDirectory(defaults);
 
     let profile = DirectoryService.get('ProfD', Ci.nsIFile);
-    log('private '+profile.path+' : '+profile.exists());
+    log(`private ${profile.path} : ${profile.exists()}`);
     if (profile.exists())
       registerCertsInDirectory(profile);
   };
@@ -168,7 +168,7 @@
   const setAutoConfirmConfigs = (aCertName, aTrust) => {
     if (!aTrust)
       aTrust = certTrusts[nsIX509Cert.CA_CERT];
-    let base = BASE + 'auto-import.' + aCertName.replace(/\./g, '_');
+    let base = `${BASE}auto-import.${aCertName.replace(/\./g, '_')}`;
     let actions = ['accept'];
     if (aTrust & nsIX509CertDB.TRUSTED_OBJSIGN)
       actions.unshift('check;id:trustObjSign');
@@ -180,13 +180,13 @@
     // 日本語環境用の設定
     autoConfirmUrls.push('chrome://pippki/content/downloadcert.xul');
     autoConfirmConfigs.push({
-      text:    '“' + aCertName + '” が行う認証のうち、信頼するものを選択してください。',
+      text:    `“${aCertName}” が行う認証のうち、信頼するものを選択してください。`,
       actions: JSON.stringify(actions)
     });
     // 英語環境用の設定
     autoConfirmUrls.push('chrome://pippki/content/downloadcert.xul');
     autoConfirmConfigs.push({
-      text:    'Do you want to trust “' + aCertName + '” for the following purposes?',
+      text:    `Do you want to trust “${aCertName}” for the following purposes?`,
       actions: JSON.stringify(actions)
     });
   };
@@ -226,7 +226,7 @@
           !/\.(cer|crt|pem|der)$/i.test(file.leafName))
         continue;
 
-      log('CHECK '+file.path);
+      log(`CHECK ${file.path}`);
 
       let certName = file.leafName.replace(/^\s+|\s+$/g, '');
       let certDate = '';
@@ -234,7 +234,7 @@
       try {
         certDate = String(file.lastModifiedTime);
         try {
-          lastCertDate = Services.prefs.getCharPref(BASE + 'certs.'+certName+'.lastDate');
+          lastCertDate = Services.prefs.getCharPref(`${BASE}certs.${certName}.lastDate`);
         }
         catch(e) {
         }
@@ -244,15 +244,15 @@
       }
 
       let overrideFile = file.parent;
-      overrideFile.append(certName+'.override');
-      log('CHECK '+overrideFile.path+'\n exists: '+overrideFile.exists());
+      overrideFile.append(`${certName}.override`);
+      log(`CHECK ${overrideFile.path}\n exists: ${overrideFile.exists()}`);
       let overrideDate = '';
       let lastOverrideDate = '';
       try {
         if (certOverride && overrideFile.exists())
           overrideDate = String(overrideFile.lastModifiedTime);
         try {
-          lastOverrideDate = Services.prefs.getCharPref(BASE + 'certs.'+certName+'.lastOverrideDate');
+          lastOverrideDate = Services.prefs.getCharPref(`${BASE}certs.${certName}.lastOverrideDate`);
         }
         catch(e) {
         }
@@ -267,7 +267,7 @@
 
       let contents = readFrom(file);
       if (!contents) continue;
-      Services.prefs.setCharPref(BASE + 'certs.'+certName+'.lastDate', certDate);
+      Services.prefs.setCharPref(`${BASE}certs.${certName}.lastDate`, certDate);
 
       let count = 0;
 
@@ -276,11 +276,11 @@
         if (certOverride) {
           if (overrideFile.exists()) {
             overrideRule = readFrom(overrideFile).replace(/^\s+|\s+$/g, '');
-            Services.prefs.setCharPref(BASE + 'certs.'+certName+'.lastOverrideDate', overrideDate);
+            Services.prefs.setCharPref(`${BASE}certs.${certName}.lastOverrideDate`, overrideDate);
           }
           else {
             try {
-              overrideRule = Services.prefs.getCharPref(BASE + 'override.'+certName);
+              overrideRule = Services.prefs.getCharPref(`${BASE}override.${certName}`);
             } catch(e) {
               overrideRule = null;
             }
@@ -299,7 +299,7 @@
           decodedCerts.push(certdb.constructX509(contents, contents.length));
         }
         catch(e) {
-          log(e+'\n');
+          log(`${e}\n`);
         }
       }
       else {
@@ -310,7 +310,7 @@
             decodedCerts.push(certdb.constructX509FromBase64(aCert));
           }
           catch(e) {
-            log(e+'\n');
+            log(`${e}\n`);
           }
         });
       }
@@ -322,15 +322,15 @@
           let serialized = serializeCert(aCert);
           let overrideCount = certOverride ? certOverride.isCertUsedForOverrides(aCert, false, true) : 0 ;
           log('====================CERT DETECTED=======================\n');
-          log('TYPE: '+aCert.certType);
-          log('FINGERPRINT: '+aCert.sha1Fingerprint);
+          log(`TYPE: ${aCert.certType}`);
+          log(`FINGERPRINT: ${aCert.sha1Fingerprint}`);
           log(serialized.split('\n')[0]);
 
           certFiles[serialized] = certName;
           certs.push(aCert);
 
           overrideRules[serialized] = overrideRule;
-          log('exceptions: registered='+overrideCount+', defined='+overrideRule.length);
+          log(`exceptions: registered=${overrideCount}, defined=${overrideRule.length}`);
           if (certOverride && overrideRule.length) {
             log(' => to be added to exception!');
             toBeAddedToException[serialized] = true;
@@ -347,7 +347,7 @@
             }
           }
           catch(e) {
-            log(e+'\n');
+            log(`${e}\n`);
           }
           log('to be installed\n');
           toBeTrusted[serialized] = true;
@@ -358,29 +358,35 @@
           importAs[certName] = importAs[certName] || aCert.certType || 0;
         }
         catch(e) {
-          log(e+'\n');
+          log(`${e}\n`);
         }
       });
 
       if (!count) {
-        log('SKIP '+file.path+' (no count)');
+        log(`SKIP ${file.path} (no count)`);
         continue;
       }
 
-      log('certName '+certName);
+      log(`certName ${certName}`);
       let type = certName in importAs ?
           importAs[certName] :
           importAs['*'] ;
-      log('type '+type);
+      log(`type ${type}`);
       try {
         if (type) {
           if (type & nsIX509Cert.CA_CERT) {
-            log('IMPORT '+file.path+' as a CA cert');
+            log(`IMPORT ${file.path} as a CA cert`);
             setAutoConfirmConfigs(certName, certTrusts[nsIX509Cert.CA_CERT]);
             importFromFile(certdb, file, nsIX509Cert.CA_CERT);
             log('done.');
           }
-          else {
+          else if (type & nsIX509Cert.EMAIL_CERT) {
+            log(`IMPORT ${file.path} as an email cert`);
+            setAutoConfirmConfigs(certName, certTrusts[nsIX509Cert.EMAIL_CERT]);
+            importFromFile(certdb, file, nsIX509Cert.EMAIL_CERT);
+            log('done.');
+          }
+          else if (type & nsIX509Cert.SERVER_CERT) {
             certTypes.forEach(aType => {
               if (type & aType) {
                 setAutoConfirmConfigs(certName, certTrusts[aType]);
@@ -389,13 +395,16 @@
               }
             });
           }
+          else {
+            log(`UNIMPORTABLE CERT: ${file.path} (${type})`);
+          }
         }
         else {
-          log('SKIP '+file.path);
+          log(`SKIP ${file.path}`);
         }
       }
       catch(e) {
-        log('Error, TYPE:'+type+'\n'+e+'\n');
+        log(`Error, TYPE:${type}\n${e}\n`);
       }
     }
 
@@ -422,22 +431,22 @@
           return;
         }
 
-        log('========= '+aNickname+' ===========');
+        log(`========= ${aNickname} ===========`);
         if (nsIX509Cert2)
           cert = cert.QueryInterface(nsIX509Cert2);
 
-        log('TYPE: '+cert.certType);
+        log(`TYPE: ${cert.certType}`);
 
         if (serialized in toBeTrusted) {
           certTypes.forEach(aType => {
             try {
               if (!('certType' in cert) || cert.certType & aType) {
-                log('register as type '+aType+': '+aNickname);
+                log(`register as type ${aType}: ${aNickname}`);
                 certdb.setCertTrust(cert, aType, certTrusts[aType]);
               }
             }
             catch(e) {
-              log('TYPE:'+aType+'\n'+e+'\n');
+              log(`TYPE:${aType}\n${e}\n`);
             }
           })
         }
@@ -446,7 +455,7 @@
           let overrideRule = overrideRules[serialized];
           if (overrideRule) {
             overrideRule.forEach(aPart => {
-              log('apply override rule '+aPart+' for '+aNickname);
+              log(`apply override rule ${aPart} for ${aNickname}`);
               aPart = aPart.replace(/^\s+|\s+$/g, '');
               if (/^\/\/|^\#/.test(aPart) ||
                   !/^[^:]+:\d+:\d+$/.test(aPart))
@@ -462,11 +471,11 @@
                     hash, fingerprint, flags, temporary
                   ) &&
                   flags.value != newFlags) {
-                log('  clear validity for '+host+':'+port);
+                log(`  clear validity for ${host}:${port}`);
                 certOverride.clearValidityOverride(host, port);
               }
 
-              log('  new flags for '+host+':'+port+' = '+newFlags);
+              log(`  new flags for ${host}:${port} = ${newFlags}`);
               if (newFlags) {
                 certOverride.rememberValidityOverride(
                   host, port,
@@ -538,7 +547,7 @@
       stream.close();
     }
     catch(e) {
-      log(e+'\n');
+      log(`${e}\n`);
       return fileContents;
     }
 
@@ -552,16 +561,16 @@
   const handleAutoConfirmWindow = (aWindow) => {
     const doc = aWindow.document;
     const url = aWindow.location.href;
-    log('url: ' + url);
+    log(`url: ${url}`);
     let fromIndex = 0;
     while (true) {
-      log('fromIndex: ' + fromIndex);
+      log(`fromIndex: ${fromIndex)}`;
       let index = autoConfirmUrls.indexOf(url, fromIndex);
-      log('index: ' + index);
+      log(`index: ${index}`);
       if (index === -1)
         return;
       let config = autoConfirmConfigs[index];
-      log('config: ' + config);
+      log(`config: ${config}`);
       if (matchedWindow(aWindow, config)) {
         aWindow.setTimeout(() => {
           let action = config.action;
@@ -579,9 +588,9 @@
 
   const processActions = (aWindow, aActions, aRootElement) => {
     const doc = aWindow.document;
-    log('actions: ' + aActions);
+    log(`actions: ${aActions}`);
     for (let action of JSON.parse(aActions)) {
-      log('action: ' + action);
+      log(`action: ${action}`);
       processAction(aWindow, action, aRootElement);
     }
   };
@@ -589,16 +598,16 @@
   const describeElement = (aElement) => {
     const description = [aElement.localName];
     if (aElement.id)
-      description.push('#' + aElement.id);
+      description.push(`#${aElement.id}`);
     if (aElement.className)
-      description.push('.' + aElement.className.replace(/\s+/g, '.'));
+      description.push(`.${aElement.className.replace(/\s+/g, '.')}`);
     return description.join('');
   };
 
   const processAction = (aWindow, aAction, aRootElement) => {
     const doc = aWindow.document;
     const root = doc.documentElement;
-    log('action: ' + aAction);
+    log(`action: ${aAction}`);
     const actions = aAction.match(/^([^;]+);?(.*)/);
     if (actions === null)
       return;
@@ -610,14 +619,14 @@
         if (typeof root.acceptDialog == 'function')
           root.acceptDialog();
         else
-          Cu.reportError(new Error('We don\'t know how to accept '+describeElement(root)));
+          Cu.reportError(new Error(`We don't know how to accept ${describeElement(root)}`));
         return;
       case 'cancel':
         log('cancel');
         if (typeof root.cancelDialog == 'function')
           root.cancelDialog();
         else
-          Cu.reportError(new Error('We don\'t know how to cancel '+describeElement(root)));
+          Cu.reportError(new Error(`We don't know how to cancel ${describeElement(root)}`));
         return;
       case 'click':
         log('click');
@@ -631,7 +640,7 @@
           }
           else {
             log('element is not clickable');
-            Cu.reportError(new Error('found element '+describeElement(element)+' is not clickable.'));
+            Cu.reportError(new Error(`found element ${describeElement(element)} is not clickable.`));
           }
         }
         return;
@@ -641,12 +650,12 @@
           buttons = root._buttons;
         }
         else {
-          Cu.reportError(new Error('We cannot detect pushable buttons in '+describeElement(root)));
+          Cu.reportError(new Error(`We cannot detect pushable buttons in ${describeElement(root)}`));
           return;
         }
         for (let type in buttons) {
           const button = buttons[type];
-          log('label: ' + button.label);
+          log(`label: ${button.label}`);
           if (button.label.match(value)) {
             button.click();
             log('push');
@@ -656,20 +665,20 @@
         log('push: no match');
         return;
       case 'input':
-        Cu.reportError(new Error('We don\'t know how to input text at '+describeElement(root)));
+        Cu.reportError(new Error(`We don't know how to input text at ${describeElement(root)}`));
         log('input');
         return;
       case 'check':
         log('check');
         if (value) {
           const element = findVisibleElementByLabel(root, value);
-          log('  element: ' + element);
+          log(`  element: ${element}`);
           log('  element.checked: ready');
           element.checked = true;
           log('  element.checked: done');
         }
         else {
-          Cu.reportError(new Error('We don\'t know how to check checkbox in '+describeElement(root)));
+          Cu.reportError(new Error(`We don't know how to check checkbox in ${describeElement(root)}`));
         }
         return;
       case 'uncheck':
@@ -682,7 +691,7 @@
           log('  element.checked: done');
         }
         else {
-          Cu.reportError(new Error('We don\'t know how to uncheck checkbox in '+describeElement(root)));
+          Cu.reportError(new Error(`We don't know how to uncheck checkbox in ${describeElement(root)}`));
         }
         return;
       default:
@@ -694,7 +703,7 @@
   const matchedWindow = (aWindow, aConfig) => {
     log('matchedWindow');
     let textMatcher = aConfig.text;
-    log('  textMatcher: ' + textMatcher);
+    log(`  textMatcher: ${textMatcher}`);
     if (textMatcher && !findVisibleElementByLabel(aWindow.document.documentElement, textMatcher))
       return false;
     log('  match');
@@ -704,14 +713,14 @@
   const findVisibleElementByLabel = (aRootElement, text) => {
     log('findVisibleElementByLabel');
     if (text.indexOf('"') !== -1) {
-      text = 'concat("' + text.replace(/"/g, '", \'"\', "') + '")';
+      text = `concat("${text.replace(/"/g, '", \'"\', "')}")`;
     } else {
-      text = '"' + text + '"';
+      text = `"${text}"`;
     }
-    let expression = '/descendant::*[contains(@label, ' + text + ')] | ' +
-                     '/descendant::*[local-name()="label" or local-name()="description"][contains(@value, ' + text + ')] | ' +
-                     '/descendant::*[contains(text(), ' + text + ')]';
-    log('  expression: ' + expression);
+    let expression = `/descendant::*[contains(@label, ${text})] | ` +
+                     `/descendant::*[local-name()="label" or local-name()="description"][contains(@value, ${text})] | ` +
+                     `/descendant::*[contains(text(), ${text})]`;
+    log(`  expression: ${expression}`);
     try {
       const doc = aRootElement.ownerDocument;
       const global = doc.defaultView;
@@ -724,9 +733,9 @@
       );
     }
     catch(e) {
-      log('  error: ' + e);
+      log(`  error: ${e}`);
     }
-    log('  elements.length: ' + elements.snapshotLength);
+    log(`  elements.length: ${elements.snapshotLength}`);
     for (let i = 0, maxi = elements.snapshotLength; i < maxi; i++) {
       const element = elements.snapshotItem(i);
       if (element.clientHeight > 0 &&
