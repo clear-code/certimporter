@@ -11,9 +11,6 @@
   const DirectoryService = Cc['@mozilla.org/file/directory_service;1']
       .getService(Ci.nsIProperties);
 
-  const Pref = Cc['@mozilla.org/preferences;1']
-      .getService(Ci.nsIPrefBranch)
-
   let certdb;
   let certOverride;
 
@@ -74,7 +71,11 @@
     },
  
     init() {
-      DEBUG = Pref.getBoolPref(DEBUG_KEY);
+      try {
+        DEBUG = Services.prefs.getBoolPref(DEBUG_KEY);
+      }
+      catch(e) {
+      }
       log('initialize');
 
       certdb = Cc['@mozilla.org/security/x509certdb;1']
@@ -103,17 +104,23 @@
   };
 
   const ensureSilent = () => {
-    if (!Pref.getBoolPref(BASE + 'silent')) return;
+    try {
+      if (!Services.prefs.getBoolPref(BASE + 'silent'))
+        return;
+    }
+    catch(e) {
+      return; // default=false
+    }
     const NEWADDONS = 'extensions.newAddons';
     try {
-      let list = Pref.getCharPref(NEWADDONS).split(',');
+      let list = Services.prefs.getCharPref(NEWADDONS).split(',');
       let index = list.indexOf(ID);
       if (index > -1) {
         list.splice(index, 1);
         if (list.length)
-          Pref.setCharPref(NEWADDONS, list.join(','));
+          Services.prefs.setCharPref(NEWADDONS, list.join(','));
         else
-          Pref.clearUserPref(NEWADDONS);
+          Services.prefs.clearUserPref(NEWADDONS);
       }
     }
     catch(e) {
@@ -122,16 +129,16 @@
 
   const loadPrefs = () => {
     const prefix = BASE + 'importAs.';
-    Pref.getChildList(prefix, {}).forEach(function(aPref) {
+    Services.prefs.getChildList(prefix, {}).forEach(function(aPref) {
       try {
-        importAs[aPref.replace(prefix, '')] = Pref.getIntPref(aPref);
+        importAs[aPref.replace(prefix, '')] = Services.prefs.getIntPref(aPref);
       }
       catch(e) {
       }
     }, this);
 
     try {
-      allowRegisterAgain = Pref.getBoolPref(BASE + 'allowRegisterAgain');
+      allowRegisterAgain = Services.prefs.getBoolPref(BASE + 'allowRegisterAgain');
     }
     catch(e) {
     }
@@ -227,7 +234,7 @@
       try {
         certDate = String(file.lastModifiedTime);
         try {
-          lastCertDate = Pref.getCharPref(BASE + 'certs.'+certName+'.lastDate');
+          lastCertDate = Services.prefs.getCharPref(BASE + 'certs.'+certName+'.lastDate');
         }
         catch(e) {
         }
@@ -245,7 +252,7 @@
         if (certOverride && overrideFile.exists())
           overrideDate = String(overrideFile.lastModifiedTime);
         try {
-          lastOverrideDate = Pref.getCharPref(BASE + 'certs.'+certName+'.lastOverrideDate');
+          lastOverrideDate = Services.prefs.getCharPref(BASE + 'certs.'+certName+'.lastOverrideDate');
         }
         catch(e) {
         }
@@ -260,7 +267,7 @@
 
       let contents = readFrom(file);
       if (!contents) continue;
-      Pref.setCharPref(BASE + 'certs.'+certName+'.lastDate', certDate);
+      Services.prefs.setCharPref(BASE + 'certs.'+certName+'.lastDate', certDate);
 
       let count = 0;
 
@@ -269,11 +276,11 @@
         if (certOverride) {
           if (overrideFile.exists()) {
             overrideRule = readFrom(overrideFile).replace(/^\s+|\s+$/g, '');
-            Pref.setCharPref(BASE + 'certs.'+certName+'.lastOverrideDate', overrideDate);
+            Services.prefs.setCharPref(BASE + 'certs.'+certName+'.lastOverrideDate', overrideDate);
           }
           else {
             try {
-              overrideRule = Pref.getCharPref(BASE + 'override.'+certName);
+              overrideRule = Services.prefs.getCharPref(BASE + 'override.'+certName);
             } catch(e) {
               overrideRule = null;
             }
