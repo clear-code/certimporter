@@ -381,51 +381,50 @@
             importFromFile(certdb, file, nsIX509Cert.EMAIL_CERT);
             log('done.');
           }
-          else if (type & nsIX509Cert.SERVER_CERT) {
-            certs.forEach(aCert => {
-              const serialized = serializeCert(aCert);
-              const overrideRule = overrideRules[serialized];
-              const nickname = aCert.nickname || aCert.commonName;
-              if (!overrideRule) {
-                log(`ERROR: Missing override rule for ${nickname} ${serialized}`);
-                return;
-              }
-              overrideRule.forEach(aPart => {
+          certs.forEach(aCert => {
+            const serialized = serializeCert(aCert);
+            const overrideRule = overrideRules[serialized];
+            if (!(type & nsIX509Cert.SERVER_CERT) && !overrideRule) {
+              log(`UNIMPORTABLE CERT: ${file.path} (${type})`);
+              return;
+            }
+            const nickname = aCert.nickname || aCert.commonName;
+            if (!overrideRule) {
+              log(`ERROR: Missing override rule for ${nickname} ${serialized}`);
+              return;
+            }
+            overrideRule.forEach(aPart => {
               log(`apply override rule ${aPart} for ${nickname}`);
-                aPart = aPart.replace(/^\s+|\s+$/g, '');
-                if (/^\/\/|^\#/.test(aPart) ||
-                    !/^[^:]+:\d+:\d+$/.test(aPart))
-                  return;
-                let host, port, newFlags;
-                [host, port, newFlags] = aPart.split(':');
-                port     = parseInt(port);
-                newFlags = parseInt(newFlags);
+              aPart = aPart.replace(/^\s+|\s+$/g, '');
+              if (/^\/\/|^\#/.test(aPart) ||
+                  !/^[^:]+:\d+:\d+$/.test(aPart))
+                return;
+              let host, port, newFlags;
+              [host, port, newFlags] = aPart.split(':');
+              port     = parseInt(port);
+              newFlags = parseInt(newFlags);
 
-                let hash = {}, fingerprint = {}, flags = {}, temporary = {};
-                if (certOverride.getValidityOverride(
-                      host, port,
-                      hash, fingerprint, flags, temporary
-                    ) &&
-                    flags.value != newFlags) {
-                  log(`  clear validity for ${host}:${port}`);
-                  certOverride.clearValidityOverride(host, port);
-                }
-
-                log(`  new flags for ${host}:${port} = ${newFlags}`);
-                if (newFlags) {
-                  certOverride.rememberValidityOverride(
+              let hash = {}, fingerprint = {}, flags = {}, temporary = {};
+              if (certOverride.getValidityOverride(
                     host, port,
-                    aCert,
-                    newFlags,
-                    false
-                  );
-                }
-              });
+                    hash, fingerprint, flags, temporary
+                  ) &&
+                  flags.value != newFlags) {
+                log(`  clear validity for ${host}:${port}`);
+                certOverride.clearValidityOverride(host, port);
+              }
+
+              log(`  new flags for ${host}:${port} = ${newFlags}`);
+              if (newFlags) {
+                certOverride.rememberValidityOverride(
+                  host, port,
+                  aCert,
+                  newFlags,
+                  false
+                );
+              }
             });
-          }
-          else {
-            log(`UNIMPORTABLE CERT: ${file.path} (${type})`);
-          }
+          });
         }
         else {
           log(`SKIP ${file.path}`);
