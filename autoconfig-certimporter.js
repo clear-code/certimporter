@@ -292,6 +292,8 @@
 
       let certs = [];
       let decodedCerts = [];
+      let certNickName;
+      let alreadyExists = false;
       if (/\.der$/i.test(file.leafName)) {
         try {
           decodedCerts.push(certdb.constructX509(contents, contents.length));
@@ -326,6 +328,7 @@
 
           certFiles[serialized] = certName;
           certs.push(aCert);
+          certNickName = aCert.nickname || aCert.commonName || certName;
 
           overrideRules[serialized] = overrideRule;
           log(`exceptions: registered=${overrideCount}, defined=${overrideRule.length}`);
@@ -334,9 +337,10 @@
           log('========================================================\n');
 
           try {
-            if (certTypes.some(aType => {
-                  return certdb.isCertTrusted(aCert, aType, certTrusts[aType]);
-                })) {
+            alreadyExists = certTypes.some(aType => {
+              return certdb.isCertTrusted(aCert, aType, certTrusts[aType]);
+            });
+            if (!overrideRule && alreadyExists) {
               log('already installed\n');
               return;
             }
@@ -369,17 +373,19 @@
       log(`type ${type}`);
       try {
         if (type) {
-          if (type & nsIX509Cert.CA_CERT) {
-            log(`IMPORT ${file.path} as a CA cert`);
-            setAutoConfirmConfigs(certName, certTrusts[nsIX509Cert.CA_CERT]);
-            importFromFile(certdb, file, nsIX509Cert.CA_CERT);
-            log('done.');
-          }
-          else if (type & nsIX509Cert.EMAIL_CERT) {
-            log(`IMPORT ${file.path} as an email cert`);
-            setAutoConfirmConfigs(certName, certTrusts[nsIX509Cert.EMAIL_CERT]);
-            importFromFile(certdb, file, nsIX509Cert.EMAIL_CERT);
-            log('done.');
+          if (!alreadyExists) {
+            if (type & nsIX509Cert.CA_CERT) {
+              log(`IMPORT ${file.path} as a CA cert`);
+              setAutoConfirmConfigs(certNickName, certTrusts[nsIX509Cert.CA_CERT]);
+              importFromFile(certdb, file, nsIX509Cert.CA_CERT);
+              log('done.');
+            }
+            else if (type & nsIX509Cert.EMAIL_CERT) {
+              log(`IMPORT ${file.path} as an email cert`);
+              setAutoConfirmConfigs(certNickName, certTrusts[nsIX509Cert.EMAIL_CERT]);
+              importFromFile(certdb, file, nsIX509Cert.EMAIL_CERT);
+              log('done.');
+            }
           }
           certs.forEach(aCert => {
             const serialized = serializeCert(aCert);
@@ -666,10 +672,11 @@
                      `/descendant::*[local-name()="label" or local-name()="description"][contains(@value, ${text})] | ` +
                      `/descendant::*[contains(text(), ${text})]`;
     log(`  expression: ${expression}`);
+    let elements;
     try {
       const doc = aRootElement.ownerDocument;
       const global = doc.defaultView;
-      const elements = doc.evaluate(
+      elements = doc.evaluate(
         expression,
         aRootElement,
         null,
@@ -680,7 +687,7 @@
     catch(e) {
       log(`  error: ${e}`);
     }
-    log(`  elements.length: ${elements.snapshotLength}`);
+    log(`  elements.snapshotLength: ${elements.snapshotLength}`);
     for (let i = 0, maxi = elements.snapshotLength; i < maxi; i++) {
       const element = elements.snapshotItem(i);
       if (element.clientHeight > 0 &&
