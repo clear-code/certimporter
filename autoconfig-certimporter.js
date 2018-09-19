@@ -61,11 +61,14 @@
                        .QueryInterface(Ci.nsIDocShell)
                        .QueryInterface(Ci.nsIDocShellTreeNode || Ci.nsIDocShellTreeItem) // nsIDocShellTreeNode is merged to nsIDocShellTreeItem by https://bugzilla.mozilla.org/show_bug.cgi?id=331376
                        .QueryInterface(Ci.nsIDocShellTreeItem)
-                       .parent)
-            aSubject.QueryInterface(Ci.nsIDOMWindow)
-                    .addEventListener('DOMContentLoaded', () => {
-                      handleAutoConfirmWindow(aSubject.QueryInterface(Ci.nsIDOMWindow));
-                    }, { once: true });
+                       .parent) {
+            const win = aSubject.QueryInterface(Ci.nsIDOMWindow);
+            win.addEventListener('load', () => {
+              win.setTimeout(() => {
+                handleAutoConfirmWindow(win);
+              }, 100);
+            }, { once: true });
+          }
           return;
       }
     },
@@ -169,25 +172,25 @@
     if (!aTrust)
       aTrust = certTrusts[nsIX509Cert.CA_CERT];
     let base = `${BASE}auto-import.${aCertName.replace(/\./g, '_')}`;
-    let actions = ['accept'];
+    let actions = [{ type: 'accept' }];
     if (aTrust & nsIX509CertDB.TRUSTED_OBJSIGN)
-      actions.unshift('check;id:trustObjSign');
+      actions.unshift({ type: 'check', target: { id: 'trustObjSign' }});
     if (aTrust & nsIX509CertDB.TRUSTED_EMAIL)
-      actions.unshift('check;id:trustEmail');
+      actions.unshift({ type: 'check', target: { id: 'trustEmail' }});
     if (aTrust & nsIX509CertDB.TRUSTED_SSL)
-      actions.unshift('check;id:trustSSL');
+      actions.unshift({ type: 'check', target: { id: 'trustSSL' }});
 
     // 日本語環境用の設定
     autoConfirmUrls.push('chrome://pippki/content/downloadcert.xul');
     autoConfirmConfigs.push({
-      text:    `“${aCertName}” が行う認証のうち、信頼するものを選択してください。`,
-      actions: JSON.stringify(actions)
+      text: `“${aCertName}” が行う認証のうち、信頼するものを選択してください。`,
+      actions
     });
     // 英語環境用の設定
     autoConfirmUrls.push('chrome://pippki/content/downloadcert.xul');
     autoConfirmConfigs.push({
-      text:    `Do you want to trust “${aCertName}” for the following purposes?`,
-      actions: JSON.stringify(actions)
+      text: `Do you want to trust “${aCertName}” for the following purposes?`,
+      actions
     });
   };
  
@@ -539,9 +542,8 @@
 
   const processActions = (aWindow, aActions, aRootElement) => {
     const doc = aWindow.document;
-    log(`actions: ${aActions}`);
-    for (let action of JSON.parse(aActions)) {
-      log(`action: ${action}`);
+    for (let action of aActions) {
+      log(`action: ${JSON.stringify(action)}`);
       processAction(aWindow, action, aRootElement);
     }
   };
@@ -558,13 +560,8 @@
   const processAction = (aWindow, aAction, aRootElement) => {
     const doc = aWindow.document;
     const root = doc.documentElement;
-    log(`action: ${aAction}`);
-    const actions = aAction.match(/^([^;]+);?(.*)/);
-    if (actions === null)
-      return;
-    const action = actions[1];
-    const value = actions[2];
-    switch (action) {
+    log(`action: ${JSON.stringify(aAction)}`);
+    switch (aAction.type) {
       case 'accept':
         log('accept');
         if (typeof root.acceptDialog == 'function')
@@ -582,7 +579,7 @@
       case 'click':
         log('click');
         {
-          let element = findVisibleElementByLabel(root, value);
+          let element = findElementByCondition(root, aAction.target);
           log(element);
           if (typeof element.click === 'function') {
             log('element.click(): ready');
@@ -595,54 +592,24 @@
           }
         }
         return;
-      case 'push':
-        let buttons;
-        if (root._buttons) {
-          buttons = root._buttons;
-        }
-        else {
-          Cu.reportError(new Error(`We cannot detect pushable buttons in ${describeElement(root)}`));
-          return;
-        }
-        for (let type in buttons) {
-          const button = buttons[type];
-          log(`label: ${button.label}`);
-          if (button.label.match(value)) {
-            button.click();
-            log('push');
-            return;
-          }
-        }
-        log('push: no match');
-        return;
-      case 'input':
-        Cu.reportError(new Error(`We don't know how to input text at ${describeElement(root)}`));
-        log('input');
-        return;
       case 'check':
         log('check');
-        if (value) {
-          const element = findVisibleElementByLabel(root, value);
+        {
+          const element = findElementByCondition(root, aAction.target);
           log(`  element: ${element}`);
           log('  element.checked: ready');
           element.checked = true;
           log('  element.checked: done');
         }
-        else {
-          Cu.reportError(new Error(`We don't know how to check checkbox in ${describeElement(root)}`));
-        }
         return;
       case 'uncheck':
         log('uncheck');
-        if (value) {
-          const element = findVisibleElementByLabel(root, value);
+        {
+          const element = findElementByCondition(root, aAction.target);
           log(element);
           log('  element.checked: ready');
           element.checked = false;
           log('  element.checked: done');
-        }
-        else {
-          Cu.reportError(new Error(`We don't know how to uncheck checkbox in ${describeElement(root)}`));
         }
         return;
       default:
@@ -655,14 +622,19 @@
     log('matchedWindow');
     let textMatcher = aConfig.text;
     log(`  textMatcher: ${textMatcher}`);
-    if (textMatcher && !findVisibleElementByLabel(aWindow.document.documentElement, textMatcher))
+    if (textMatcher && !findElementByCondition(aWindow.document.documentElement, { text: textMatcher }))
       return false;
     log('  match');
     return  true;
   };
 
-  const findVisibleElementByLabel = (aRootElement, text) => {
-    log('findVisibleElementByLabel');
+  const findElementByCondition = (aRootElement, condition) => {
+    log('findElementByCondition');
+    if (condition.id)
+      return aRootElement.querySelector(`#${condition.id}`);
+    if (!condition.text)
+      return null;
+    let text = condition.text;
     if (text.indexOf('"') !== -1) {
       text = `concat("${text.replace(/"/g, '", \'"\', "')}")`;
     } else {
@@ -703,3 +675,4 @@
     .getService(Ci.nsIWindowWatcher)
     .registerNotification(observer);
 }; 
+
