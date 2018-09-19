@@ -229,7 +229,7 @@
 
       log(`CHECK ${file.path}`);
 
-      let certName = file.leafName.replace(/^\s+|\s+$/g, '');
+      let certName = file.leafName.trim();
       let certDate = '';
       let lastCertDate = '';
       try {
@@ -317,6 +317,12 @@
           }
         });
       }
+      let forceRegisterFromFile = false;
+      try {
+        forceRegisterFromFile = Services.prefs.getBoolPref(`${BASE}forceRegisterFromFile.${certName}`);
+      }
+      catch(e) {
+      }
       decodedCerts.forEach(aCert => {
         try {
           if (nsIX509Cert2)
@@ -343,7 +349,7 @@
             alreadyExists = certTypes.some(aType => {
               return certdb.isCertTrusted(aCert, aType, certTrusts[aType]);
             });
-            if (!overrideRule && alreadyExists) {
+            if (alreadyExists && !overrideRule && !forceRegisterFromFile) {
               log('already installed\n');
               return;
             }
@@ -376,7 +382,9 @@
       log(`type ${type}`);
       try {
         if (type) {
-          if (!alreadyExists) {
+          if (!alreadyExists || forceRegisterFromFile) {
+            if (forceRegisterFromFile)
+              Services.prefs.setBoolPref(`${BASE}forceRegisterFromFile.${certName}`, false);
             if (type & nsIX509Cert.CA_CERT) {
               log(`IMPORT ${file.path} as a CA cert`);
               setAutoConfirmConfigs(certNickName, certTrusts[nsIX509Cert.CA_CERT]);
