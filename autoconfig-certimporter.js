@@ -1,4 +1,4 @@
-{// Cert Importer, for Firefox 52/Thunderbird 52 and later
+{// Cert Importer, for Firefox 91/Thunderbird 91 and later
   const { classes: Cc, interfaces: Ci, utils: Cu } = Components;
   const { Services } = Cu.import('resource://gre/modules/Services.jsm', {});
 
@@ -42,7 +42,7 @@
   const log = (...args) => {
     if (!DEBUG)
       return;
-    const str = Array.slice(args).join('\n');
+    const str = Array.from(args).join('\n');
     Cc['@mozilla.org/consoleservice;1']
       .getService(Ci.nsIConsoleService)
       .logStringMessage(`[certimporter] ${str}`);
@@ -56,13 +56,12 @@
           this.init();
           return;
         case 'domwindowopened':
-          if (!aSubject.QueryInterface(Ci.nsIInterfaceRequestor)
-                       .getInterface(Ci.nsIWebNavigation)
+          if (!aSubject.getInterface(Ci.nsIWebNavigation)
                        .QueryInterface(Ci.nsIDocShell)
                        .QueryInterface(Ci.nsIDocShellTreeNode || Ci.nsIDocShellTreeItem) // nsIDocShellTreeNode is merged to nsIDocShellTreeItem by https://bugzilla.mozilla.org/show_bug.cgi?id=331376
                        .QueryInterface(Ci.nsIDocShellTreeItem)
                        .parent) {
-            const win = aSubject.QueryInterface(Ci.nsIDOMWindow);
+            const win = aSubject.getInterface(Ci.nsIDOMWindow);
             win.addEventListener('load', () => {
               win.setTimeout(() => {
                 handleAutoConfirmWindow(win);
@@ -181,13 +180,13 @@
       actions.unshift({ type: 'check', target: { id: 'trustSSL' }});
 
     // 日本語環境用の設定
-    autoConfirmUrls.push('chrome://pippki/content/downloadcert.xul');
+    autoConfirmUrls.push('chrome://pippki/content/downloadcert.xhtml');
     autoConfirmConfigs.push({
       text: `“${aCertName}” が行う認証のうち、信頼するものを選択してください。`,
       actions
     });
     // 英語環境用の設定
-    autoConfirmUrls.push('chrome://pippki/content/downloadcert.xul');
+    autoConfirmUrls.push('chrome://pippki/content/downloadcert.xhtml');
     autoConfirmConfigs.push({
       text: `Do you want to trust “${aCertName}” for the following purposes?`,
       actions
@@ -567,7 +566,7 @@
 
   const processAction = (aWindow, aAction, aRootElement) => {
     const doc = aWindow.document;
-    const root = doc.documentElement;
+    const root = doc.querySelector('dialog');
     log(`action: ${JSON.stringify(aAction)}`);
     switch (aAction.type) {
       case 'accept':
