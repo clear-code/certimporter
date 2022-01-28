@@ -223,7 +223,7 @@
     while (files.hasMoreElements()) {
       const file = files.getNext().QueryInterface(Ci.nsIFile);
       if (!file.isFile() ||
-          !/\.(cer|crt|pem|der)$/i.test(file.leafName))
+          !/\.(cer|crt|pem|der|pfx)$/i.test(file.leafName))
         continue;
 
       log(`CHECK ${file.path}`);
@@ -264,6 +264,23 @@
       if ((!allowRegisterAgain && lastCertDate == certDate) &&
         lastOverrideDate == overrideDate)
         continue;
+
+      // PKCS12 client cert with password
+      if (/\.(pfx)$/i.test(file.leafName)) {
+        const certdialogs = Cc['@mozilla.org/nsCertificateDialogs;1'].getService(Ci.nsICertificateDialogs);
+        const password = {};
+        let errorCode = Ci.nsIX509CertDB.ERROR_BAD_PASSWORD;
+        while (errorCode == Ci.nsIX509CertDB.ERROR_BAD_PASSWORD &&
+               certdialogs.getPKCS12FilePassword(null, password)) {
+          errorCode = certdb.importPKCS12File(file, password.value);
+          if (errorCode == Ci.nsIX509CertDB.ERROR_BAD_PASSWORD &&
+              password.value.length == 0) {
+            errorCode = certdb.importPKCS12File(file, null);
+          }
+          log(`failed to import PKCS12 cert: ${errorCode == Ci.nsIX509CertDB.ERROR_BAD_PASSWORD ? 'bad password' : errorCode}`);
+        }
+        continue;
+      }
 
       let contents = readFrom(file);
       if (!contents) continue;
